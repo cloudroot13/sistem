@@ -1,0 +1,17 @@
+# Dependencies are installed by the deployment platform
+node_modules/
+
+# Production and tool output
+dist/
+.vite/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs and editor files
+*.log
+.DS_Store
+.vscode/
+.idea/
