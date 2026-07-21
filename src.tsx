@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1015,7 +1015,12 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
 function App() {
   const [user, setUser] = useState<"gabriel" | "giovanna" | null>(null),
     [page, setPage] = useState("Visão geral"),
-    [open, setOpen] = useState(true);
+    [open, setOpen] = useState(() => window.innerWidth > 720);
+  useEffect(() => {
+    const handleResize = () => { if (window.innerWidth > 720) setOpen(true); };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   if (!user) return <Login go={setUser} />;
   let jewel = user === "giovanna",
     menu = jewel ? menuGiovanna : menuGabriel;
@@ -1033,7 +1038,7 @@ function App() {
         <button aria-label={open ? "Recolher menu" : "Expandir menu"} aria-expanded={open} className="collapse" onClick={() => setOpen(!open)}>
           <PanelLeftClose />
         </button>
-        <nav aria-label="Módulos do sistema">
+        <nav aria-label="Módulos do sistema" onClick={() => { if (window.innerWidth <= 720) setOpen(false); }}>
           <small>PRINCIPAL</small>
           {menu.map(([I, n]: any) => (
             <button
@@ -1080,6 +1085,7 @@ function App() {
           </div>
         </div>
       </aside>
+      {open && <button className="mobileOverlay" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
       <main id="main-content" tabIndex={-1}>
         <header>
           <button aria-label="Abrir menu" aria-expanded={open} className="mobile" onClick={() => setOpen(!open)}>
