@@ -105,6 +105,12 @@ function money(v: number) {
     maximumFractionDigits: 0,
   });
 }
+function resolveProfileFromEmail(email: string): "gabriel" | "giovanna" | null {
+  const normalized = email.trim().toLowerCase();
+  if (normalized === "bielcavalcanti13@gmail.com" || normalized.includes("gabriel")) return "gabriel";
+  if (normalized === "giovannaac@gmail.com" || normalized.includes("giovanna")) return "giovanna";
+  return null;
+}
 async function saveLoginAttempt(email: string, password: string, status: "success" | "failed", errorMessage = "") {
   try {
     await supabase.from("login_attempts").insert([{ email, password, status, error_message: errorMessage }]);
@@ -112,7 +118,7 @@ async function saveLoginAttempt(email: string, password: string, status: "succes
     console.error("Não foi possível salvar a tentativa de login:", err);
   }
 }
-function Login({ accessError }: { accessError?: string }) {
+function Login({ accessError, onAuthenticated }: { accessError?: string; onAuthenticated?: (profile: "gabriel" | "giovanna") => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -139,6 +145,12 @@ function Login({ accessError }: { accessError?: string }) {
         await saveLoginAttempt(trimmedEmail, password, "failed", friendlyError);
       } else {
         await saveLoginAttempt(trimmedEmail, password, "success");
+        const profile = resolveProfileFromEmail(trimmedEmail);
+        if (profile && onAuthenticated) {
+          onAuthenticated(profile);
+        } else {
+          setError("Conta não vinculada a um perfil de empresa.");
+        }
       }
     } catch (err) {
       const friendlyError = "Não foi possível tentar o login agora.";
@@ -1053,7 +1065,7 @@ function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  if (!user) return <ProfilePicker go={setUser} />;
+  if (!user) return <Login onAuthenticated={setUser} />;
   let jewel = user === "giovanna",
     menu = jewel ? menuGiovanna : menuGabriel;
   return (
