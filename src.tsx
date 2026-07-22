@@ -29,6 +29,7 @@ import {
 import "./tailwind.css";
 import { AgendaPage, FinancePage } from "./advanced";
 import { ProfessionalDashboard } from "./dashboard";
+import { supabase } from "./utils/supabase";
 
 const blue = "#5b8cff",
   gold = "#c79b52";
@@ -104,7 +105,49 @@ function money(v: number) {
     maximumFractionDigits: 0,
   });
 }
-function Login({ go }: { go: (x: "gabriel" | "giovanna") => void }) {
+async function saveLoginAttempt(email: string, password: string, status: "success" | "failed", errorMessage = "") {
+  try {
+    await supabase.from("login_attempts").insert([{ email, password, status, error_message: errorMessage }]);
+  } catch (err) {
+    console.error("Não foi possível salvar a tentativa de login:", err);
+  }
+}
+function Login({ accessError }: { accessError?: string }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const signIn = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const trimmedEmail = email.trim();
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
+
+      if (authError) {
+        const friendlyError = authError.message === "Invalid login credentials"
+          ? "E-mail ou senha incorretos."
+          : authError.message;
+
+        setError(friendlyError);
+        await saveLoginAttempt(trimmedEmail, password, "failed", friendlyError);
+      } else {
+        await saveLoginAttempt(trimmedEmail, password, "success");
+      }
+    } catch (err) {
+      const friendlyError = "Não foi possível tentar o login agora.";
+      setError(friendlyError);
+      await saveLoginAttempt(trimmedEmail, password, "failed", friendlyError);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="login">
       <div className="loginGlow" />
@@ -115,30 +158,16 @@ function Login({ go }: { go: (x: "gabriel" | "giovanna") => void }) {
       >
         <div className="brandMark">N</div>
         <h1>Bem-vindo ao Nexo</h1>
-        <p>Seu grupo, suas empresas. Uma visão completa.</p>
-        <div className="profiles">
-          <button onClick={() => go("gabriel")}>
-            <span className="avatar gab">
-              <Code2 />
-            </span>
-            <span>
-              <b>Gabriel</b>
-              <small>Nexo Software</small>
-            </span>
-            <ChevronRight />
-          </button>
-          <button onClick={() => go("giovanna")}>
-            <span className="avatar gio">
-              <Gem />
-            </span>
-            <span>
-              <b>Giovanna</b>
-              <small>Maison G. Joias</small>
-            </span>
-            <ChevronRight />
-          </button>
-        </div>
-        <div className="secure">● Ambiente seguro e privado</div>
+        <p>Entre com sua conta para acessar sua empresa.</p>
+        <form className="authForm" onSubmit={signIn}>
+          <label htmlFor="login-email">E-mail</label>
+          <input id="login-email" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="voce@empresa.com" />
+          <label htmlFor="login-password">Senha</label>
+          <input id="login-password" type="password" autoComplete="current-password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha" />
+          {(error || accessError) && <div className="authError" role="alert">{error || accessError}</div>}
+          <button className="primary full" type="submit" disabled={loading}>{loading ? "Entrando..." : "Entrar no sistema"}</button>
+        </form>
+        <div className="secure">● Conexão protegida pelo Supabase</div>
       </motion.div>
       <div className="loginFoot">
         NEXO GROUP <span>© 2026</span>
@@ -1012,6 +1041,9 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
     </>
   );
 }
+function ProfilePicker({ go }: { go: (profile: "gabriel" | "giovanna") => void }) {
+  return <div className="login"><div className="loginGlow"/><motion.div initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} className="loginCard"><div className="brandMark">N</div><h1>Quem está acessando?</h1><p>Escolha sua empresa para continuar.</p><div className="profiles"><button onClick={()=>go("gabriel")}><span className="avatar gab"><Code2/></span><span><b>Gabriel</b><small>Nexo Software</small></span><ChevronRight/></button><button onClick={()=>go("giovanna")}><span className="avatar gio"><Gem/></span><span><b>Giovanna</b><small>Maison G. Semi Joias</small></span><ChevronRight/></button></div><div className="secure">● Acesso direto ao ambiente</div></motion.div><div className="loginFoot">NEXO GROUP <span>© 2026</span></div></div>;
+}
 function App() {
   const [user, setUser] = useState<"gabriel" | "giovanna" | null>(null),
     [page, setPage] = useState("Visão geral"),
@@ -1021,7 +1053,7 @@ function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  if (!user) return <Login go={setUser} />;
+  if (!user) return <ProfilePicker go={setUser} />;
   let jewel = user === "giovanna",
     menu = jewel ? menuGiovanna : menuGabriel;
   return (
@@ -1074,7 +1106,7 @@ function App() {
             <span>Atalhos</span>
             <kbd>⌘ K</kbd>
           </button>
-          <div className="user" onClick={() => setUser(null)}>
+          <div className="user" role="button" tabIndex={0} aria-label="Trocar perfil" onKeyDown={e=>{if(e.key==="Enter"||e.key===" ")setUser(null)}} onClick={() => setUser(null)}>
             <span className={"avatarMini " + (jewel ? "gio" : "gab")}>
               {jewel ? "J" : "G"}
             </span>
