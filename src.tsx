@@ -175,7 +175,7 @@ function Login({ accessError, onAuthenticated }: { accessError?: string; onAuthe
           <label htmlFor="login-email">E-mail</label>
           <input id="login-email" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="voce@empresa.com" />
           <label htmlFor="login-password">Senha</label>
-          <input id="login-password" type="password" autoComplete="current-password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha" />
+          <input id="login-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha" />
           {(error || accessError) && <div className="authError" role="alert">{error || accessError}</div>}
           <button className="primary full" type="submit" disabled={loading}>{loading ? "Entrando..." : "Entrar no sistema"}</button>
         </form>
