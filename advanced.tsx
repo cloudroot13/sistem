@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createEvent, createTransaction, deleteEvent, deleteTransaction, listEvents, listTransactions, updateEvent } from "./services/data";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays,
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 
 type Transaction = {
-  id: number;
+  id: string | number;
   description: string;
   category: string;
   type: "Entrada" | "Saída";
@@ -23,7 +24,7 @@ type Transaction = {
   status: "Pago" | "Pendente";
 };
 type EventItem = {
-  id: number;
+  id: string | number;
   title: string;
   kind: string;
   date: string;
@@ -153,25 +154,10 @@ const eventSeed: Record<string, EventItem[]> = {
     },
   ],
 };
-function useStored<T>(key: string, seed: T) {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(key) || "null") || seed;
-    } catch {
-      return seed;
-    }
-  });
-  const update = (next: T) => {
-    setValue(next);
-    localStorage.setItem(key, JSON.stringify(next));
-  };
-  return [value, update] as const;
-}
 export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
-  const [items, setItems] = useStored(
-    `nexo-finance-${owner}`,
-    financeSeed[owner],
-  );
+  const [items, setItems] = useState<Transaction[]>([]);
+  const [dataError,setDataError]=useState("");
+  useEffect(()=>{listTransactions(owner).then(setItems).catch(()=>setDataError("Não foi possível carregar o financeiro."))},[owner]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("Todos");
   const [open, setOpen] = useState(false);
@@ -200,14 +186,9 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
       ),
     [items, filter, query],
   );
-  const add = () => {
+  const add = async () => {
     if (!draft.description || !Number(draft.amount)) return;
-    setItems([
-      { id: Date.now(), ...draft, amount: Number(draft.amount) },
-      ...items,
-    ]);
-    setOpen(false);
-    setDraft({ ...draft, description: "", category: "", amount: "" });
+    try{const created=await createTransaction(owner,{...draft,amount:Number(draft.amount)});setItems([created,...items]);setOpen(false);setDraft({...draft,description:"",category:"",amount:""});setDataError("")}catch{setDataError("Não foi possível salvar o lançamento.")}
   };
   const csv = () => {
     const data = [
@@ -270,6 +251,7 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
           </span>
         </article>
       </section>
+      {dataError&&<div className="dataError" role="alert">{dataError}</div>}
       <section
         className="card advancedCard"
         aria-labelledby="transactions-title"
@@ -326,7 +308,7 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
               </strong>
               <button
                 aria-label={`Excluir ${x.description}`}
-                onClick={() => setItems(items.filter((y) => y.id !== x.id))}
+                onClick={() => deleteTransaction(String(x.id)).then(()=>setItems(items.filter(y=>y.id!==x.id))).catch(()=>setDataError("Não foi possível excluir o lançamento."))}
               >
                 ×
               </button>
@@ -447,7 +429,9 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
   );
 }
 export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
-  const [items, setItems] = useStored(`nexo-agenda-${owner}`, eventSeed[owner]);
+  const [items, setItems] = useState<EventItem[]>([]);
+  const [dataError,setDataError]=useState("");
+  useEffect(()=>{listEvents(owner).then(setItems).catch(()=>setDataError("Não foi possível carregar a agenda."))},[owner]);
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState("2026-07-20");
   const [draft, setDraft] = useState({
@@ -463,11 +447,9 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const add = () => {
+  const add = async () => {
     if (!draft.title) return;
-    setItems([{ id: Date.now(), ...draft }, ...items]);
-    setOpen(false);
-    setDraft({ ...draft, title: "" });
+    try{const created=await createEvent(owner,draft);setItems([created,...items]);setOpen(false);setDraft({...draft,title:""});setDataError("")}catch{setDataError("Não foi possível salvar o compromisso.")}
   };
   const selected = items
     .filter((x) => x.date === day)
@@ -537,13 +519,7 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
                   <input
                     type="checkbox"
                     checked={x.done}
-                    onChange={() =>
-                      setItems(
-                        items.map((y) =>
-                          y.id === x.id ? { ...y, done: !y.done } : y,
-                        ),
-                      )
-                    }
+                    onChange={()=>{const done=!x.done;setItems(items.map(y=>y.id===x.id?{...y,done}:y));updateEvent(String(x.id),{done}).catch(()=>setDataError("Não foi possível atualizar o compromisso."))}}
                   />
                   <span className="sr-only">
                     Marcar {x.title} como concluído
@@ -551,7 +527,7 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
                 </label>
                 <button
                   aria-label={`Excluir ${x.title}`}
-                  onClick={() => setItems(items.filter((y) => y.id !== x.id))}
+                  onClick={() => deleteEvent(String(x.id)).then(()=>setItems(items.filter(y=>y.id!==x.id))).catch(()=>setDataError("Não foi possível excluir o compromisso."))}
                 >
                   ×
                 </button>

@@ -30,6 +30,7 @@ import "./tailwind.css";
 import { AgendaPage, FinancePage } from "./advanced";
 import { ProfessionalDashboard } from "./dashboard";
 import { supabase } from "./utils/supabase";
+import { createGoal, createRecord, deleteRecord, listGoals, listRecords, updateRecord } from "./services/data";
 
 const blue = "#5b8cff",
   gold = "#c79b52";
@@ -105,20 +106,7 @@ function money(v: number) {
     maximumFractionDigits: 0,
   });
 }
-function resolveProfileFromEmail(email: string): "gabriel" | "giovanna" | null {
-  const normalized = email.trim().toLowerCase();
-  if (normalized === "bielcavalcanti13@gmail.com" || normalized.includes("gabriel")) return "gabriel";
-  if (normalized === "giovannaac@gmail.com" || normalized.includes("giovanna")) return "giovanna";
-  return null;
-}
-async function saveLoginAttempt(email: string, password: string, status: "success" | "failed", errorMessage = "") {
-  try {
-    await supabase.from("login_attempts").insert([{ email, password, status, error_message: errorMessage }]);
-  } catch (err) {
-    console.error("Não foi possível salvar a tentativa de login:", err);
-  }
-}
-function Login({ accessError, onAuthenticated }: { accessError?: string; onAuthenticated?: (profile: "gabriel" | "giovanna") => void }) {
+function Login({ accessError }: { accessError?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -142,20 +130,10 @@ function Login({ accessError, onAuthenticated }: { accessError?: string; onAuthe
           : authError.message;
 
         setError(friendlyError);
-        await saveLoginAttempt(trimmedEmail, password, "failed", friendlyError);
-      } else {
-        await saveLoginAttempt(trimmedEmail, password, "success");
-        const profile = resolveProfileFromEmail(trimmedEmail);
-        if (profile && onAuthenticated) {
-          onAuthenticated(profile);
-        } else {
-          setError("Conta não vinculada a um perfil de empresa.");
-        }
       }
     } catch (err) {
       const friendlyError = "Não foi possível tentar o login agora.";
       setError(friendlyError);
-      await saveLoginAttempt(trimmedEmail, password, "failed", friendlyError);
     } finally {
       setLoading(false);
     }
@@ -246,6 +224,11 @@ function Chart({ jewel = false }: { jewel?: boolean }) {
 }
 function Goals() {
   const [show, setShow] = useState(false);
+  const [goalItems,setGoalItems]=useState<any[]>([]),[dataError,setDataError]=useState("");
+  const [draft,setDraft]=useState({title:"",description:"",target:"",deadline:""});
+  useEffect(()=>{listGoals().then(setGoalItems).catch(()=>setDataError("Não foi possível carregar as metas."))},[]);
+  const addGoal=async()=>{if(!draft.title||!Number(draft.target))return;try{const created=await createGoal({title:draft.title,description:draft.description,target_amount:Number(draft.target),deadline:draft.deadline||null});setGoalItems([created,...goalItems]);setDraft({title:"",description:"",target:"",deadline:""});setShow(false)}catch{setDataError("Não foi possível criar a meta.")}};
+  const saved=goalItems.reduce((s,g)=>s+Number(g.current_amount||0),0);const average=goalItems.length?Math.round(goalItems.reduce((s,g)=>s+(Number(g.target_amount)?Number(g.current_amount)/Number(g.target_amount)*100:0),0)/goalItems.length):0;
   return (
     <>
       <div className="pageTitle">
@@ -263,53 +246,54 @@ function Goals() {
         <div>
           <Target />
           <span>
-            <b>R$ 166.300</b>
+            <b>{money(saved)}</b>
             <small>guardados em conjunto</small>
           </span>
         </div>
         <div>
-          <b>3</b>
+          <b>{goalItems.length}</b>
           <small>metas ativas</small>
         </div>
         <div>
-          <b>49%</b>
+          <b>{average}%</b>
           <small>progresso médio</small>
         </div>
       </div>
       <div className="goalGrid">
-        {goals.map((g, i) => (
+        {goalItems.map((g, i) => {const progress=Number(g.target_amount)?Math.min(100,Math.round(Number(g.current_amount)/Number(g.target_amount)*100)):0;return (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08 }}
             className="goal"
-            key={g.title}
+            key={g.id}
           >
             <div className="goalTop">
-              <span className="tag">{g.cat}</span>
-              <span className="owners">{g.owner}</span>
+              <span className="tag">{g.category||"Meta"}</span>
+              <span className="owners">GJ</span>
             </div>
             <h3>{g.title}</h3>
             <div className="numbers">
-              <b>{money(g.now)}</b>
-              <span>de {money(g.total)}</span>
+              <b>{money(Number(g.current_amount||0))}</b>
+              <span>de {money(Number(g.target_amount||0))}</span>
             </div>
             <div className="progress">
               <motion.i
                 initial={{ width: 0 }}
-                animate={{ width: g.p + "%" }}
+                animate={{ width: progress + "%" }}
                 transition={{ duration: 1 }}
               />
             </div>
             <div className="goalBottom">
-              <b>{g.p}% concluído</b>
+              <b>{progress}% concluído</b>
               <span>
-                <CalendarDays /> {g.date}
+                <CalendarDays /> {g.deadline?new Date(g.deadline+"T12:00").toLocaleDateString("pt-BR"):"Sem prazo"}
               </span>
             </div>
           </motion.div>
-        ))}
+        )})}
       </div>
+      {dataError&&<div className="dataError" role="alert">{dataError}</div>}
       <div className="card activity">
         <div className="cardHead">
           <div>
@@ -344,23 +328,23 @@ function Goals() {
               <h2>Criar meta em conjunto</h2>
               <label>
                 Título
-                <input placeholder="Ex: Comprar nosso apartamento" autoFocus />
+                <input placeholder="Ex: Comprar nosso apartamento" autoFocus value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/>
               </label>
               <div className="formRow">
                 <label>
                   Valor alvo
-                  <input placeholder="R$ 0,00" />
+                  <input inputMode="decimal" placeholder="R$ 0,00" value={draft.target} onChange={e=>setDraft({...draft,target:e.target.value.replace(",",".")})}/>
                 </label>
                 <label>
                   Data final
-                  <input type="date" />
+                  <input type="date" value={draft.deadline} onChange={e=>setDraft({...draft,deadline:e.target.value})}/>
                 </label>
               </div>
               <label>
                 Descrição
-                <textarea placeholder="Por que essa meta é importante?" />
+                <textarea placeholder="Por que essa meta é importante?" value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/>
               </label>
-              <button className="primary full" onClick={() => setShow(false)}>
+              <button className="primary full" onClick={addGoal}>
                 Criar meta
               </button>
             </motion.div>
@@ -600,7 +584,7 @@ function Overview({ jewel }: { jewel: boolean }) {
   );
 }
 type RecordItem = {
-  id: number;
+  id: string | number;
   title: string;
   subtitle: string;
   value: string;
@@ -820,18 +804,8 @@ const moduleInfo: Record<string, [string, string]> = {
   Pedidos: ["Acompanhe vendas da aprovação à entrega.", "pedido"],
 };
 function OperationalModule({ name, owner }: { name: string; owner: string }) {
-  const key = `nexo-${owner}-${name}`;
-  const [items, setItems] = useState<RecordItem[]>(() => {
-    try {
-      return (
-        JSON.parse(localStorage.getItem(key) || "null") ||
-        moduleSeed[name] ||
-        []
-      );
-    } catch {
-      return moduleSeed[name] || [];
-    }
-  });
+  const [items, setItems] = useState<RecordItem[]>([]);
+  const [dataLoading,setDataLoading]=useState(true),[dataError,setDataError]=useState("");
   const [query, setQuery] = useState("");
   const [show, setShow] = useState(false);
   const [draft, setDraft] = useState({
@@ -841,15 +815,10 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
     status: "Novo",
     date: "",
   });
-  const save = (next: RecordItem[]) => {
-    setItems(next);
-    localStorage.setItem(key, JSON.stringify(next));
-  };
-  const add = () => {
+  useEffect(()=>{setDataLoading(true);listRecords(owner as "gabriel"|"giovanna",name).then(setItems).catch(()=>setDataError("Não foi possível carregar os dados. Verifique o Supabase.")).finally(()=>setDataLoading(false))},[owner,name]);
+  const add = async () => {
     if (!draft.title.trim()) return;
-    save([{ id: Date.now(), ...draft, date: draft.date || "Hoje" }, ...items]);
-    setDraft({ title: "", subtitle: "", value: "", status: "Novo", date: "" });
-    setShow(false);
+    try{const created=await createRecord(owner as "gabriel"|"giovanna",name,{...draft,date:draft.date||"Hoje"});setItems([created,...items]);setDraft({ title: "", subtitle: "", value: "", status: "Novo", date: "" });setShow(false);setDataError("")}catch{setDataError("Não foi possível salvar o registro.")}
   };
   const visible = items.filter((x) =>
     (x.title + x.subtitle + x.status)
@@ -934,21 +903,7 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
               <strong>{x.value || "—"}</strong>
               <button
                 className="statusPill"
-                onClick={() =>
-                  save(
-                    items.map((y) =>
-                      y.id === x.id
-                        ? {
-                            ...y,
-                            status:
-                              y.status === "Concluído"
-                                ? "Em andamento"
-                                : "Concluído",
-                          }
-                        : y,
-                    ),
-                  )
-                }
+                onClick={async()=>{const status=x.status==="Concluído"?"Em andamento":"Concluído";setItems(items.map(y=>y.id===x.id?{...y,status}:y));try{await updateRecord(String(x.id),{status})}catch{setDataError("Não foi possível atualizar o status.")}}}
               >
                 {x.status}
               </button>
@@ -957,14 +912,16 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
                 className="rowDelete"
                 onClick={() => {
                   if (confirm("Excluir este registro?"))
-                    save(items.filter((y) => y.id !== x.id));
+                    deleteRecord(String(x.id)).then(()=>setItems(items.filter(y=>y.id!==x.id))).catch(()=>setDataError("Não foi possível excluir o registro."));
                 }}
               >
                 ×
               </button>
             </motion.div>
           ))}
-          {!visible.length && (
+          {dataLoading && <div className="empty"><Clock3/><b>Carregando dados...</b></div>}
+          {dataError && <div className="dataError" role="alert">{dataError}</div>}
+          {!dataLoading && !visible.length && (
             <div className="empty">
               <Search />
               <b>Nenhum registro encontrado</b>
@@ -1059,13 +1016,33 @@ function ProfilePicker({ go }: { go: (profile: "gabriel" | "giovanna") => void }
 function App() {
   const [user, setUser] = useState<"gabriel" | "giovanna" | null>(null),
     [page, setPage] = useState("Visão geral"),
-    [open, setOpen] = useState(() => window.innerWidth > 720);
+    [open, setOpen] = useState(() => window.innerWidth > 720),
+    [authLoading, setAuthLoading] = useState(true),
+    [accessError, setAccessError] = useState("");
+  useEffect(() => {
+    let active = true;
+    const resolveCompany = async (session: any) => {
+      if (!session) { if (active) { setUser(null); setAuthLoading(false); } return; }
+      const { data, error } = await supabase.from("company_members").select("companies(slug)").eq("user_id", session.user.id).maybeSingle();
+      const slug = (data as any)?.companies?.slug;
+      if (!active) return;
+      if (error || (slug !== "gabriel" && slug !== "giovanna")) {
+        setAccessError("Esta conta ainda não foi vinculada a uma empresa no Supabase.");
+        setUser(null); setAuthLoading(false); return;
+      }
+      setAccessError(""); setUser(slug); setAuthLoading(false);
+    };
+    supabase.auth.getSession().then(({ data }) => resolveCompany(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => resolveCompany(session));
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth > 720) setOpen(true); };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  if (!user) return <Login onAuthenticated={setUser} />;
+  if (authLoading) return <div className="authLoading"><div className="brandMark">N</div><span>Carregando seu ambiente...</span></div>;
+  if (!user) return <Login accessError={accessError} />;
   let jewel = user === "giovanna",
     menu = jewel ? menuGiovanna : menuGabriel;
   return (
@@ -1118,7 +1095,7 @@ function App() {
             <span>Atalhos</span>
             <kbd>⌘ K</kbd>
           </button>
-          <div className="user" role="button" tabIndex={0} aria-label="Trocar perfil" onKeyDown={e=>{if(e.key==="Enter"||e.key===" ")setUser(null)}} onClick={() => setUser(null)}>
+          <div className="user" role="button" tabIndex={0} aria-label="Sair do sistema" onKeyDown={e=>{if(e.key==="Enter"||e.key===" ")supabase.auth.signOut()}} onClick={() => supabase.auth.signOut()}>
             <span className={"avatarMini " + (jewel ? "gio" : "gab")}>
               {jewel ? "J" : "G"}
             </span>

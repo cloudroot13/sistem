@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { financeSeed } from "./advanced";
+import { createTransaction, listTransactions } from "./services/data";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -279,16 +279,8 @@ export function ProfessionalDashboard({
     }),
     [refreshing, setRefreshing] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
-  const [financeItems, setFinanceItems] = useState(() => {
-    try {
-      return (
-        JSON.parse(localStorage.getItem(`nexo-finance-${owner}`) || "null") ||
-        financeSeed[owner]
-      );
-    } catch {
-      return financeSeed[owner];
-    }
-  });
+  const [financeItems, setFinanceItems] = useState<any[]>([]);
+  useEffect(()=>{listTransactions(owner).then(setFinanceItems).catch(()=>{})},[owner]);
   const [expenseDraft, setExpenseDraft] = useState({
     description: "",
     category: "Operacional",
@@ -303,22 +295,17 @@ export function ProfessionalDashboard({
   const pendingExpenses = expenses
     .filter((item: any) => item.status === "Pendente")
     .reduce((sum: number, item: any) => sum + Number(item.amount), 0);
-  const addExpense = () => {
+  const receivedIncome = financeItems.filter((item:any)=>item.type==="Entrada"&&item.status==="Pago").reduce((sum:number,item:any)=>sum+Number(item.amount),0);
+  const actualProfit = receivedIncome-paidExpenses;
+  const addExpense = async () => {
     const amount = Number(expenseDraft.amount.replace(",", "."));
     if (!expenseDraft.description.trim() || !amount) return;
-    const next = [
-      { id: Date.now(), ...expenseDraft, amount, type: "Saída" as const },
-      ...financeItems,
-    ];
-    setFinanceItems(next);
-    localStorage.setItem(`nexo-finance-${owner}`, JSON.stringify(next));
-    setExpenseDraft({ ...expenseDraft, description: "", amount: "" });
-    setExpenseOpen(false);
+    try{const created=await createTransaction(owner,{...expenseDraft,amount,type:"Saída"});setFinanceItems([created,...financeItems]);setExpenseDraft({...expenseDraft,description:"",amount:""});setExpenseOpen(false)}catch{return}
   };
   const periodIndex = (
     ["7 dias", "30 dias", "90 dias", "Este ano"] as Period[]
   ).indexOf(period);
-  const revenue = cfg.kpis[0].values[periodIndex];
+  const revenue = financeItems.length ? receivedIncome : cfg.kpis[0].values[periodIndex];
   const toggleWidget = (x: string) => {
     const next = hidden.includes(x)
       ? hidden.filter((y) => y !== x)
@@ -439,7 +426,7 @@ export function ProfessionalDashboard({
         <section className="proKpis" aria-label="Indicadores principais">
           {cfg.kpis.map((k, i) => {
             const Icon = k.icon,
-              val = k.values[periodIndex];
+              val = financeItems.length && i===0 ? receivedIncome : financeItems.length && i===1 ? actualProfit : k.values[periodIndex];
             return (
               <motion.article
                 initial={{ opacity: 0, y: 8 }}
