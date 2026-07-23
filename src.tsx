@@ -30,7 +30,14 @@ import "./tailwind.css";
 import { AgendaPage, FinancePage } from "./advanced";
 import { ProfessionalDashboard } from "./dashboard";
 import { supabase } from "./utils/supabase";
-import { createGoal, createRecord, deleteRecord, listGoals, listRecords, updateRecord } from "./services/data";
+import {
+  createGoal,
+  createRecord,
+  deleteRecord,
+  listGoals,
+  listRecords,
+  updateRecord,
+} from "./services/data";
 
 const blue = "#5b8cff",
   gold = "#c79b52";
@@ -125,9 +132,10 @@ function Login({ accessError }: { accessError?: string }) {
       });
 
       if (authError) {
-        const friendlyError = authError.message === "Invalid login credentials"
-          ? "E-mail ou senha incorretos."
-          : authError.message;
+        const friendlyError =
+          authError.message === "Invalid login credentials"
+            ? "E-mail ou senha incorretos."
+            : authError.message;
 
         setError(friendlyError);
       }
@@ -151,11 +159,33 @@ function Login({ accessError }: { accessError?: string }) {
         <p>Entre com sua conta para acessar sua empresa.</p>
         <form className="authForm" onSubmit={signIn}>
           <label htmlFor="login-email">E-mail</label>
-          <input id="login-email" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="voce@empresa.com" />
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@empresa.com"
+          />
           <label htmlFor="login-password">Senha</label>
-          <input id="login-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha" />
-          {(error || accessError) && <div className="authError" role="alert">{error || accessError}</div>}
-          <button className="primary full" type="submit" disabled={loading}>{loading ? "Entrando..." : "Entrar no sistema"}</button>
+          <input
+            id="login-password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Sua senha"
+          />
+          {(error || accessError) && (
+            <div className="authError" role="alert">
+              {error || accessError}
+            </div>
+          )}
+          <button className="primary full" type="submit" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar no sistema"}
+          </button>
         </form>
         <div className="secure">● Conexão protegida pelo Supabase</div>
       </motion.div>
@@ -195,7 +225,9 @@ function Chart({ jewel = false }: { jewel?: boolean }) {
   let c = jewel ? gold : blue,
     d = jewel ? jewelData : devData;
   const max = Math.max(...d.map((item) => item.v));
-  const points = d.map((item, index) => `${index * 20},${92 - (item.v / max) * 76}`).join(" ");
+  const points = d
+    .map((item, index) => `${index * 20},${92 - (item.v / max) * 76}`)
+    .join(" ");
   return (
     <div className="card chart">
       <div className="cardHead">
@@ -210,25 +242,90 @@ function Chart({ jewel = false }: { jewel?: boolean }) {
         <span>+18,4%</span>
       </div>
       <div className="lightChart">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-labelledby="chart-title chart-description">
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          role="img"
+          aria-labelledby="chart-title chart-description"
+        >
           <title id="chart-title">Receita dos últimos seis meses</title>
-          <desc id="chart-description">Crescimento de {d[0].v} mil para {d[d.length - 1].v} mil reais.</desc>
-          <defs><linearGradient id={`fill-${jewel}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={c} stopOpacity=".35"/><stop offset="1" stopColor={c} stopOpacity="0"/></linearGradient></defs>
-          <polygon points={`0,100 ${points} 100,100`} fill={`url(#fill-${jewel})`}/>
-          <polyline points={points} fill="none" stroke={c} strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>
+          <desc id="chart-description">
+            Crescimento de {d[0].v} mil para {d[d.length - 1].v} mil reais.
+          </desc>
+          <defs>
+            <linearGradient id={`fill-${jewel}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={c} stopOpacity=".35" />
+              <stop offset="1" stopColor={c} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polygon
+            points={`0,100 ${points} 100,100`}
+            fill={`url(#fill-${jewel})`}
+          />
+          <polyline
+            points={points}
+            fill="none"
+            stroke={c}
+            strokeWidth="1.8"
+            vectorEffect="non-scaling-stroke"
+          />
         </svg>
-        <div className="chartLabels">{d.map(item => <span key={item.m}>{item.m}</span>)}</div>
+        <div className="chartLabels">
+          {d.map((item) => (
+            <span key={item.m}>{item.m}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 function Goals() {
   const [show, setShow] = useState(false);
-  const [goalItems,setGoalItems]=useState<any[]>([]),[dataError,setDataError]=useState("");
-  const [draft,setDraft]=useState({title:"",description:"",target:"",deadline:""});
-  useEffect(()=>{listGoals().then(setGoalItems).catch(()=>setDataError("Não foi possível carregar as metas."))},[]);
-  const addGoal=async()=>{if(!draft.title||!Number(draft.target))return;try{const created=await createGoal({title:draft.title,description:draft.description,target_amount:Number(draft.target),deadline:draft.deadline||null});setGoalItems([created,...goalItems]);setDraft({title:"",description:"",target:"",deadline:""});setShow(false)}catch{setDataError("Não foi possível criar a meta.")}};
-  const saved=goalItems.reduce((s,g)=>s+Number(g.current_amount||0),0);const average=goalItems.length?Math.round(goalItems.reduce((s,g)=>s+(Number(g.target_amount)?Number(g.current_amount)/Number(g.target_amount)*100:0),0)/goalItems.length):0;
+  const [goalItems, setGoalItems] = useState<any[]>([]),
+    [dataError, setDataError] = useState("");
+  const [draft, setDraft] = useState({
+    title: "",
+    description: "",
+    target: "",
+    deadline: "",
+  });
+  useEffect(() => {
+    listGoals()
+      .then(setGoalItems)
+      .catch(() => setDataError("Não foi possível carregar as metas."));
+  }, []);
+  const addGoal = async () => {
+    if (!draft.title || !Number(draft.target)) return;
+    try {
+      const created = await createGoal({
+        title: draft.title,
+        description: draft.description,
+        target_amount: Number(draft.target),
+        deadline: draft.deadline || null,
+      });
+      setGoalItems([created, ...goalItems]);
+      setDraft({ title: "", description: "", target: "", deadline: "" });
+      setShow(false);
+    } catch {
+      setDataError("Não foi possível criar a meta.");
+    }
+  };
+  const saved = goalItems.reduce(
+    (s, g) => s + Number(g.current_amount || 0),
+    0,
+  );
+  const average = goalItems.length
+    ? Math.round(
+        goalItems.reduce(
+          (s, g) =>
+            s +
+            (Number(g.target_amount)
+              ? (Number(g.current_amount) / Number(g.target_amount)) * 100
+              : 0),
+          0,
+        ) / goalItems.length,
+      )
+    : 0;
   return (
     <>
       <div className="pageTitle">
@@ -260,40 +357,59 @@ function Goals() {
         </div>
       </div>
       <div className="goalGrid">
-        {goalItems.map((g, i) => {const progress=Number(g.target_amount)?Math.min(100,Math.round(Number(g.current_amount)/Number(g.target_amount)*100)):0;return (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="goal"
-            key={g.id}
-          >
-            <div className="goalTop">
-              <span className="tag">{g.category||"Meta"}</span>
-              <span className="owners">GJ</span>
-            </div>
-            <h3>{g.title}</h3>
-            <div className="numbers">
-              <b>{money(Number(g.current_amount||0))}</b>
-              <span>de {money(Number(g.target_amount||0))}</span>
-            </div>
-            <div className="progress">
-              <motion.i
-                initial={{ width: 0 }}
-                animate={{ width: progress + "%" }}
-                transition={{ duration: 1 }}
-              />
-            </div>
-            <div className="goalBottom">
-              <b>{progress}% concluído</b>
-              <span>
-                <CalendarDays /> {g.deadline?new Date(g.deadline+"T12:00").toLocaleDateString("pt-BR"):"Sem prazo"}
-              </span>
-            </div>
-          </motion.div>
-        )})}
+        {goalItems.map((g, i) => {
+          const progress = Number(g.target_amount)
+            ? Math.min(
+                100,
+                Math.round(
+                  (Number(g.current_amount) / Number(g.target_amount)) * 100,
+                ),
+              )
+            : 0;
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="goal"
+              key={g.id}
+            >
+              <div className="goalTop">
+                <span className="tag">{g.category || "Meta"}</span>
+                <span className="owners">GJ</span>
+              </div>
+              <h3>{g.title}</h3>
+              <div className="numbers">
+                <b>{money(Number(g.current_amount || 0))}</b>
+                <span>de {money(Number(g.target_amount || 0))}</span>
+              </div>
+              <div className="progress">
+                <motion.i
+                  initial={{ width: 0 }}
+                  animate={{ width: progress + "%" }}
+                  transition={{ duration: 1 }}
+                />
+              </div>
+              <div className="goalBottom">
+                <b>{progress}% concluído</b>
+                <span>
+                  <CalendarDays />{" "}
+                  {g.deadline
+                    ? new Date(g.deadline + "T12:00").toLocaleDateString(
+                        "pt-BR",
+                      )
+                    : "Sem prazo"}
+                </span>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
-      {dataError&&<div className="dataError" role="alert">{dataError}</div>}
+      {dataError && (
+        <div className="dataError" role="alert">
+          {dataError}
+        </div>
+      )}
       <div className="card activity">
         <div className="cardHead">
           <div>
@@ -301,15 +417,11 @@ function Goals() {
             <p>Atualizações das metas compartilhadas</p>
           </div>
         </div>
-        <p>
-          <span className="avatarMini gio">G</span>
-          <b>Giovanna</b> adicionou R$ 1.200 em “Viagem para Itália”{" "}
-          <small>há 2 horas</small>
-        </p>
-        <p>
-          <span className="avatarMini gab">G</span>
-          <b>Gabriel</b> comentou em “Comprar apartamento” <small>ontem</small>
-        </p>
+        <div className="dashboardEmpty compact">
+          <Clock3 />
+          <b>Nenhuma atividade registrada</b>
+          <span>As próximas atualizações das metas aparecerão aqui.</span>
+        </div>
       </div>
       <AnimatePresence>
         {show && (
@@ -328,21 +440,50 @@ function Goals() {
               <h2>Criar meta em conjunto</h2>
               <label>
                 Título
-                <input placeholder="Ex: Comprar nosso apartamento" autoFocus value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/>
+                <input
+                  placeholder="Ex: Comprar nosso apartamento"
+                  autoFocus
+                  value={draft.title}
+                  onChange={(e) =>
+                    setDraft({ ...draft, title: e.target.value })
+                  }
+                />
               </label>
               <div className="formRow">
                 <label>
                   Valor alvo
-                  <input inputMode="decimal" placeholder="R$ 0,00" value={draft.target} onChange={e=>setDraft({...draft,target:e.target.value.replace(",",".")})}/>
+                  <input
+                    inputMode="decimal"
+                    placeholder="R$ 0,00"
+                    value={draft.target}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        target: e.target.value.replace(",", "."),
+                      })
+                    }
+                  />
                 </label>
                 <label>
                   Data final
-                  <input type="date" value={draft.deadline} onChange={e=>setDraft({...draft,deadline:e.target.value})}/>
+                  <input
+                    type="date"
+                    value={draft.deadline}
+                    onChange={(e) =>
+                      setDraft({ ...draft, deadline: e.target.value })
+                    }
+                  />
                 </label>
               </div>
               <label>
                 Descrição
-                <textarea placeholder="Por que essa meta é importante?" value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/>
+                <textarea
+                  placeholder="Por que essa meta é importante?"
+                  value={draft.description}
+                  onChange={(e) =>
+                    setDraft({ ...draft, description: e.target.value })
+                  }
+                />
               </label>
               <button className="primary full" onClick={addGoal}>
                 Criar meta
@@ -805,7 +946,8 @@ const moduleInfo: Record<string, [string, string]> = {
 };
 function OperationalModule({ name, owner }: { name: string; owner: string }) {
   const [items, setItems] = useState<RecordItem[]>([]);
-  const [dataLoading,setDataLoading]=useState(true),[dataError,setDataError]=useState("");
+  const [dataLoading, setDataLoading] = useState(true),
+    [dataError, setDataError] = useState("");
   const [query, setQuery] = useState("");
   const [show, setShow] = useState(false);
   const [draft, setDraft] = useState({
@@ -815,10 +957,38 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
     status: "Novo",
     date: "",
   });
-  useEffect(()=>{setDataLoading(true);listRecords(owner as "gabriel"|"giovanna",name).then(setItems).catch(()=>setDataError("Não foi possível carregar os dados. Verifique o Supabase.")).finally(()=>setDataLoading(false))},[owner,name]);
+  useEffect(() => {
+    setDataLoading(true);
+    listRecords(owner as "gabriel" | "giovanna", name)
+      .then(setItems)
+      .catch(() =>
+        setDataError(
+          "Não foi possível carregar os dados. Verifique o Supabase.",
+        ),
+      )
+      .finally(() => setDataLoading(false));
+  }, [owner, name]);
   const add = async () => {
     if (!draft.title.trim()) return;
-    try{const created=await createRecord(owner as "gabriel"|"giovanna",name,{...draft,date:draft.date||"Hoje"});setItems([created,...items]);setDraft({ title: "", subtitle: "", value: "", status: "Novo", date: "" });setShow(false);setDataError("")}catch{setDataError("Não foi possível salvar o registro.")}
+    try {
+      const created = await createRecord(
+        owner as "gabriel" | "giovanna",
+        name,
+        { ...draft, date: draft.date || "Hoje" },
+      );
+      setItems([created, ...items]);
+      setDraft({
+        title: "",
+        subtitle: "",
+        value: "",
+        status: "Novo",
+        date: "",
+      });
+      setShow(false);
+      setDataError("");
+    } catch {
+      setDataError("Não foi possível salvar o registro.");
+    }
   };
   const visible = items.filter((x) =>
     (x.title + x.subtitle + x.status)
@@ -826,11 +996,34 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
       .includes(query.toLowerCase()),
   );
   const isGiovanna = owner === "giovanna";
-  const gioIdentity: Record<string, { label: string; note: string; icon: any; metric: string }> = {
-    Estoque: { label: "ATELIÊ DE PRODUTOS", note: "Curadoria, coleções e disponibilidade das peças.", icon: Package, metric: "64 peças disponíveis" },
-    Clientes: { label: "RELACIONAMENTO", note: "Conheça preferências e encante em cada contato.", icon: Users, metric: "2 clientes VIP" },
-    Fornecedores: { label: "REDE DE PARCEIROS", note: "Abastecimento, materiais e prazos sob controle.", icon: Truck, metric: "Prazo médio: 9 dias" },
-    Pedidos: { label: "CENTRAL DE PEDIDOS", note: "Da confirmação do pagamento até a entrega.", icon: ShoppingBag, metric: "R$ 1.569 em pedidos" },
+  const gioIdentity: Record<
+    string,
+    { label: string; note: string; icon: any; metric: string }
+  > = {
+    Estoque: {
+      label: "ATELIÊ DE PRODUTOS",
+      note: "Curadoria, coleções e disponibilidade das peças.",
+      icon: Package,
+      metric: "64 peças disponíveis",
+    },
+    Clientes: {
+      label: "RELACIONAMENTO",
+      note: "Conheça preferências e encante em cada contato.",
+      icon: Users,
+      metric: "2 clientes VIP",
+    },
+    Fornecedores: {
+      label: "REDE DE PARCEIROS",
+      note: "Abastecimento, materiais e prazos sob controle.",
+      icon: Truck,
+      metric: "Prazo médio: 9 dias",
+    },
+    Pedidos: {
+      label: "CENTRAL DE PEDIDOS",
+      note: "Da confirmação do pagamento até a entrega.",
+      icon: ShoppingBag,
+      metric: "R$ 1.569 em pedidos",
+    },
   };
   const identity = gioIdentity[name];
   const IdentityIcon = identity?.icon || Gem;
@@ -838,7 +1031,9 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
     <>
       <div className="pageTitle">
         <div>
-          <span className="eyebrow">{identity?.label || "MÓDULO OPERACIONAL"}</span>
+          <span className="eyebrow">
+            {identity?.label || "MÓDULO OPERACIONAL"}
+          </span>
           <h1>{name}</h1>
           <p>{identity?.note || moduleInfo[name]?.[0]}</p>
         </div>
@@ -847,8 +1042,27 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
           Novo {moduleInfo[name]?.[1]}
         </button>
       </div>
-      {isGiovanna && identity && <motion.section initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} className={`gioModuleHero identity-${name.toLowerCase()}`} aria-label={`Resumo de ${name}`}><div className="gioHeroIcon"><IdentityIcon /></div><div><small>{identity.label}</small><b>{identity.metric}</b><span>{identity.note}</span></div><Gem className="gioWatermark" /></motion.section>}
-      <div className={`moduleKpis ${isGiovanna ? `gioKpis identity-${name.toLowerCase()}` : ""}`}>
+      {isGiovanna && identity && (
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`gioModuleHero identity-${name.toLowerCase()}`}
+          aria-label={`Resumo de ${name}`}
+        >
+          <div className="gioHeroIcon">
+            <IdentityIcon />
+          </div>
+          <div>
+            <small>{identity.label}</small>
+            <b>{identity.metric}</b>
+            <span>{identity.note}</span>
+          </div>
+          <Gem className="gioWatermark" />
+        </motion.section>
+      )}
+      <div
+        className={`moduleKpis ${isGiovanna ? `gioKpis identity-${name.toLowerCase()}` : ""}`}
+      >
         <div>
           <small>Registros</small>
           <b>{items.length}</b>
@@ -865,7 +1079,9 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
           <span>dados salvos automaticamente</span>
         </div>
       </div>
-      <div className={`card moduleCard ${isGiovanna ? `gioModule identity-${name.toLowerCase()}` : ""}`}>
+      <div
+        className={`card moduleCard ${isGiovanna ? `gioModule identity-${name.toLowerCase()}` : ""}`}
+      >
         <div className="moduleTools">
           <div className="moduleSearch">
             <Search />
@@ -894,7 +1110,11 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
               key={x.id}
             >
               <div className="rowTitle">
-                <i>{isGiovanna && name === "Estoque" ? ["✦","◇","○"][i%3] : x.title[0]}</i>
+                <i>
+                  {isGiovanna && name === "Estoque"
+                    ? ["✦", "◇", "○"][i % 3]
+                    : x.title[0]}
+                </i>
                 <span>
                   <b>{x.title}</b>
                   <small>{x.subtitle || "Sem descrição"}</small>
@@ -903,7 +1123,18 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
               <strong>{x.value || "—"}</strong>
               <button
                 className="statusPill"
-                onClick={async()=>{const status=x.status==="Concluído"?"Em andamento":"Concluído";setItems(items.map(y=>y.id===x.id?{...y,status}:y));try{await updateRecord(String(x.id),{status})}catch{setDataError("Não foi possível atualizar o status.")}}}
+                onClick={async () => {
+                  const status =
+                    x.status === "Concluído" ? "Em andamento" : "Concluído";
+                  setItems(
+                    items.map((y) => (y.id === x.id ? { ...y, status } : y)),
+                  );
+                  try {
+                    await updateRecord(String(x.id), { status });
+                  } catch {
+                    setDataError("Não foi possível atualizar o status.");
+                  }
+                }}
               >
                 {x.status}
               </button>
@@ -912,15 +1143,28 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
                 className="rowDelete"
                 onClick={() => {
                   if (confirm("Excluir este registro?"))
-                    deleteRecord(String(x.id)).then(()=>setItems(items.filter(y=>y.id!==x.id))).catch(()=>setDataError("Não foi possível excluir o registro."));
+                    deleteRecord(String(x.id))
+                      .then(() => setItems(items.filter((y) => y.id !== x.id)))
+                      .catch(() =>
+                        setDataError("Não foi possível excluir o registro."),
+                      );
                 }}
               >
                 ×
               </button>
             </motion.div>
           ))}
-          {dataLoading && <div className="empty"><Clock3/><b>Carregando dados...</b></div>}
-          {dataError && <div className="dataError" role="alert">{dataError}</div>}
+          {dataLoading && (
+            <div className="empty">
+              <Clock3 />
+              <b>Carregando dados...</b>
+            </div>
+          )}
+          {dataError && (
+            <div className="dataError" role="alert">
+              {dataError}
+            </div>
+          )}
           {!dataLoading && !visible.length && (
             <div className="empty">
               <Search />
@@ -1010,8 +1254,51 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
     </>
   );
 }
-function ProfilePicker({ go }: { go: (profile: "gabriel" | "giovanna") => void }) {
-  return <div className="login"><div className="loginGlow"/><motion.div initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} className="loginCard"><div className="brandMark">N</div><h1>Quem está acessando?</h1><p>Escolha sua empresa para continuar.</p><div className="profiles"><button onClick={()=>go("gabriel")}><span className="avatar gab"><Code2/></span><span><b>Gabriel</b><small>Nexo Software</small></span><ChevronRight/></button><button onClick={()=>go("giovanna")}><span className="avatar gio"><Gem/></span><span><b>Giovanna</b><small>Maison G. Semi Joias</small></span><ChevronRight/></button></div><div className="secure">● Acesso direto ao ambiente</div></motion.div><div className="loginFoot">NEXO GROUP <span>© 2026</span></div></div>;
+function ProfilePicker({
+  go,
+}: {
+  go: (profile: "gabriel" | "giovanna") => void;
+}) {
+  return (
+    <div className="login">
+      <div className="loginGlow" />
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="loginCard"
+      >
+        <div className="brandMark">N</div>
+        <h1>Quem está acessando?</h1>
+        <p>Escolha sua empresa para continuar.</p>
+        <div className="profiles">
+          <button onClick={() => go("gabriel")}>
+            <span className="avatar gab">
+              <Code2 />
+            </span>
+            <span>
+              <b>Gabriel</b>
+              <small>Nexo Software</small>
+            </span>
+            <ChevronRight />
+          </button>
+          <button onClick={() => go("giovanna")}>
+            <span className="avatar gio">
+              <Gem />
+            </span>
+            <span>
+              <b>Giovanna</b>
+              <small>Maison G. Semi Joias</small>
+            </span>
+            <ChevronRight />
+          </button>
+        </div>
+        <div className="secure">● Acesso direto ao ambiente</div>
+      </motion.div>
+      <div className="loginFoot">
+        NEXO GROUP <span>© 2026</span>
+      </div>
+    </div>
+  );
 }
 function App() {
   const [user, setUser] = useState<"gabriel" | "giovanna" | null>(null),
@@ -1022,33 +1309,67 @@ function App() {
   useEffect(() => {
     let active = true;
     const resolveCompany = async (session: any) => {
-      if (!session) { if (active) { setUser(null); setAuthLoading(false); } return; }
-      const { data, error } = await supabase.from("company_members").select("companies(slug)").eq("user_id", session.user.id).maybeSingle();
+      if (!session) {
+        if (active) {
+          setUser(null);
+          setAuthLoading(false);
+        }
+        return;
+      }
+      const { data, error } = await supabase
+        .from("company_members")
+        .select("companies(slug)")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
       const slug = (data as any)?.companies?.slug;
       if (!active) return;
       if (error || (slug !== "gabriel" && slug !== "giovanna")) {
-        setAccessError("Esta conta ainda não foi vinculada a uma empresa no Supabase.");
-        setUser(null); setAuthLoading(false); return;
+        setAccessError(
+          "Esta conta ainda não foi vinculada a uma empresa no Supabase.",
+        );
+        setUser(null);
+        setAuthLoading(false);
+        return;
       }
-      setAccessError(""); setUser(slug); setAuthLoading(false);
+      setAccessError("");
+      setUser(slug);
+      setAuthLoading(false);
     };
     supabase.auth.getSession().then(({ data }) => resolveCompany(data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => resolveCompany(session));
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => resolveCompany(session),
+    );
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
   useEffect(() => {
-    const handleResize = () => { if (window.innerWidth > 720) setOpen(true); };
+    const handleResize = () => {
+      if (window.innerWidth > 720) setOpen(true);
+    };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  if (authLoading) return <div className="authLoading"><div className="brandMark">N</div><span>Carregando seu ambiente...</span></div>;
+  if (authLoading)
+    return (
+      <div className="authLoading">
+        <div className="brandMark">N</div>
+        <span>Carregando seu ambiente...</span>
+      </div>
+    );
   if (!user) return <Login accessError={accessError} />;
   let jewel = user === "giovanna",
     menu = jewel ? menuGiovanna : menuGabriel;
   return (
     <div className={"app " + (jewel ? "jewel" : "")}>
-      <a className="skipLink" href="#main-content">Pular para o conteúdo</a>
-      <aside aria-label="Navegação principal" className={open ? "" : "collapsed"}>
+      <a className="skipLink" href="#main-content">
+        Pular para o conteúdo
+      </a>
+      <aside
+        aria-label="Navegação principal"
+        className={open ? "" : "collapsed"}
+      >
         <div className="logo">
           <div>{jewel ? <Gem /> : <Code2 />}</div>
           <span>
@@ -1056,10 +1377,20 @@ function App() {
             <small>{jewel ? "SEMI JOIAS" : "SOFTWARE"}</small>
           </span>
         </div>
-        <button aria-label={open ? "Recolher menu" : "Expandir menu"} aria-expanded={open} className="collapse" onClick={() => setOpen(!open)}>
+        <button
+          aria-label={open ? "Recolher menu" : "Expandir menu"}
+          aria-expanded={open}
+          className="collapse"
+          onClick={() => setOpen(!open)}
+        >
           <PanelLeftClose />
         </button>
-        <nav aria-label="Módulos do sistema" onClick={() => { if (window.innerWidth <= 720) setOpen(false); }}>
+        <nav
+          aria-label="Módulos do sistema"
+          onClick={() => {
+            if (window.innerWidth <= 720) setOpen(false);
+          }}
+        >
           <small>PRINCIPAL</small>
           {menu.map(([I, n]: any) => (
             <button
@@ -1095,7 +1426,16 @@ function App() {
             <span>Atalhos</span>
             <kbd>⌘ K</kbd>
           </button>
-          <div className="user" role="button" tabIndex={0} aria-label="Sair do sistema" onKeyDown={e=>{if(e.key==="Enter"||e.key===" ")supabase.auth.signOut()}} onClick={() => supabase.auth.signOut()}>
+          <div
+            className="user"
+            role="button"
+            tabIndex={0}
+            aria-label="Sair do sistema"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") supabase.auth.signOut();
+            }}
+            onClick={() => supabase.auth.signOut()}
+          >
             <span className={"avatarMini " + (jewel ? "gio" : "gab")}>
               {jewel ? "J" : "G"}
             </span>
@@ -1106,15 +1446,28 @@ function App() {
           </div>
         </div>
       </aside>
-      {open && <button className="mobileOverlay" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
+      {open && (
+        <button
+          className="mobileOverlay"
+          aria-label="Fechar menu"
+          onClick={() => setOpen(false)}
+        />
+      )}
       <main id="main-content" tabIndex={-1}>
         <header>
-          <button aria-label="Abrir menu" aria-expanded={open} className="mobile" onClick={() => setOpen(!open)}>
+          <button
+            aria-label="Abrir menu"
+            aria-expanded={open}
+            className="mobile"
+            onClick={() => setOpen(!open)}
+          >
             <Menu />
           </button>
           <div className="search">
             <Search />
-            <label className="sr-only" htmlFor="global-search">Pesquisa global</label>
+            <label className="sr-only" htmlFor="global-search">
+              Pesquisa global
+            </label>
             <input id="global-search" placeholder="Buscar em tudo..." />
             <kbd>⌘ K</kbd>
           </div>
@@ -1139,7 +1492,7 @@ function App() {
           {page === "Metas" ? (
             <Goals />
           ) : page === "Calendário" ? (
-            <Calendar />
+            <AgendaPage owner={user} />
           ) : page === "Financeiro" ? (
             <FinancePage owner={user} />
           ) : page === "Agenda" ? (

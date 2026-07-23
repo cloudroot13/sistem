@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { createTransaction, listTransactions } from "./services/data";
+import {
+  createTransaction,
+  listEvents,
+  listGoals,
+  listRecords,
+  listTransactions,
+} from "./services/data";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -44,72 +50,32 @@ const configs = {
     kpis: [
       {
         label: "Receita",
-        values: [18240, 54420, 142800, 468200],
-        change: 14.2,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: CircleDollarSign,
       },
       {
         label: "Lucro líquido",
-        values: [9840, 31280, 79400, 276500],
-        change: 11.8,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: TrendingUp,
       },
       {
         label: "Projetos ativos",
-        values: [7, 12, 18, 42],
-        change: 8.4,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: FolderKanban,
         plain: true,
       },
       {
         label: "Conversão",
-        values: [28.4, 32.8, 31.6, 34.2],
-        change: 4.7,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: Target,
         percent: true,
       },
     ],
-    series: [18, 24, 21, 36, 42, 54],
-    labels: ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"],
     operationTitle: "Pipeline de projetos",
-    operation: [
-      {
-        name: "Nuvem Analytics",
-        meta: "Entrega em 8 dias",
-        value: 78,
-        color: "#5b8cff",
-      },
-      {
-        name: "Estúdio Lume",
-        meta: "Em desenvolvimento",
-        value: 52,
-        color: "#8a6cf0",
-      },
-      {
-        name: "Clínica Vitta",
-        meta: "Aguardando aprovação",
-        value: 34,
-        color: "#4cb6a1",
-      },
-    ],
-    alerts: [
-      {
-        title: "Entrega Nuvem Analytics",
-        meta: "Prazo em 8 dias",
-        tone: "warn",
-      },
-      {
-        title: "3 leads sem follow-up",
-        meta: "Há mais de 5 dias",
-        tone: "danger",
-      },
-      { title: "Fatura de hospedagem", meta: "Vence amanhã", tone: "info" },
-    ],
-    tasks: [
-      "Enviar proposta Studio Norte",
-      "Revisar protótipo Clínica Vitta",
-      "Agendar reunião de kickoff",
-    ],
   },
   giovanna: {
     eyebrow: "MAISON G. · BUSINESS OVERVIEW",
@@ -119,71 +85,31 @@ const configs = {
     kpis: [
       {
         label: "Faturamento",
-        values: [12480, 46280, 126400, 398600],
-        change: 18.4,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: CircleDollarSign,
       },
       {
         label: "Lucro líquido",
-        values: [5940, 21940, 58200, 184300],
-        change: 15.8,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: TrendingUp,
       },
       {
         label: "Pedidos",
-        values: [34, 128, 362, 1248],
-        change: 12.2,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: ShoppingBag,
         plain: true,
       },
       {
         label: "Ticket médio",
-        values: [367, 362, 349, 319],
-        change: 5.3,
+        values: [0, 0, 0, 0],
+        change: 0,
         icon: Gem,
       },
     ],
-    series: [12, 19, 27, 24, 38, 46],
-    labels: ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"],
     operationTitle: "Desempenho das coleções",
-    operation: [
-      {
-        name: "Coleção Aurora",
-        meta: "42 peças vendidas",
-        value: 86,
-        color: "#c79b52",
-      },
-      {
-        name: "Essenciais",
-        meta: "31 peças vendidas",
-        value: 64,
-        color: "#c882a5",
-      },
-      {
-        name: "Lumière",
-        meta: "24 peças vendidas",
-        value: 48,
-        color: "#8e72b6",
-      },
-    ],
-    alerts: [
-      { title: "Brinco Lumière", meta: "Somente 8 unidades", tone: "warn" },
-      {
-        title: "Pedido #1047 pendente",
-        meta: "Aguardando separação",
-        tone: "danger",
-      },
-      {
-        title: "Reposição Coleção Aurora",
-        meta: "Prevista para amanhã",
-        tone: "info",
-      },
-    ],
-    tasks: [
-      "Confirmar pedido com fornecedora",
-      "Publicar fotos da Coleção Aurora",
-      "Separar pedidos #1047 e #1049",
-    ],
   },
 };
 function TrendChart({
@@ -195,7 +121,7 @@ function TrendChart({
   labels: string[];
   color: string;
 }) {
-  const max = Math.max(...values),
+  const max = Math.max(...values, 1),
     points = values.map((v, i) => `${i * 20},${90 - (v / max) * 72}`).join(" ");
   return (
     <div className="proChart">
@@ -280,7 +206,30 @@ export function ProfessionalDashboard({
     [refreshing, setRefreshing] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [financeItems, setFinanceItems] = useState<any[]>([]);
-  useEffect(()=>{listTransactions(owner).then(setFinanceItems).catch(()=>{})},[owner]);
+  useEffect(() => {
+    listTransactions(owner)
+      .then(setFinanceItems)
+      .catch(() => {});
+  }, [owner]);
+  const [operationItems, setOperationItems] = useState<any[]>([]),
+    [agendaItems, setAgendaItems] = useState<any[]>([]),
+    [goalItems, setGoalItems] = useState<any[]>([]),
+    [secondaryCount, setSecondaryCount] = useState(0);
+  useEffect(() => {
+    Promise.all([
+      listRecords(owner, owner === "gabriel" ? "Projetos" : "Estoque"),
+      listRecords(owner, owner === "gabriel" ? "CRM" : "Pedidos"),
+      listEvents(owner),
+      listGoals(),
+    ])
+      .then(([operation, secondary, agenda, goals]) => {
+        setOperationItems(operation);
+        setSecondaryCount(secondary.length);
+        setAgendaItems(agenda);
+        setGoalItems(goals);
+      })
+      .catch(() => {});
+  }, [owner]);
   const [expenseDraft, setExpenseDraft] = useState({
     description: "",
     category: "Operacional",
@@ -288,24 +237,118 @@ export function ProfessionalDashboard({
     date: new Date().toISOString().slice(0, 10),
     status: "Pago" as "Pago" | "Pendente",
   });
-  const expenses = financeItems.filter((item: any) => item.type === "Saída");
+  const periodStart = (() => {
+    const now = new Date();
+    if (period === "Este ano") return new Date(now.getFullYear(), 0, 1);
+    const days = period === "7 dias" ? 7 : period === "30 dias" ? 30 : 90;
+    const start = new Date(now);
+    start.setDate(start.getDate() - days);
+    return start;
+  })();
+  const filteredFinance = financeItems.filter(
+    (item: any) => new Date(`${item.date}T12:00`) >= periodStart,
+  );
+  const expenses = filteredFinance.filter((item: any) => item.type === "Saída");
   const paidExpenses = expenses
     .filter((item: any) => item.status === "Pago")
     .reduce((sum: number, item: any) => sum + Number(item.amount), 0);
   const pendingExpenses = expenses
     .filter((item: any) => item.status === "Pendente")
     .reduce((sum: number, item: any) => sum + Number(item.amount), 0);
-  const receivedIncome = financeItems.filter((item:any)=>item.type==="Entrada"&&item.status==="Pago").reduce((sum:number,item:any)=>sum+Number(item.amount),0);
-  const actualProfit = receivedIncome-paidExpenses;
+  const receivedIncome = filteredFinance
+    .filter((item: any) => item.type === "Entrada" && item.status === "Pago")
+    .reduce((sum: number, item: any) => sum + Number(item.amount), 0);
+  const actualProfit = receivedIncome - paidExpenses;
+  const statusProgress = (status: string) =>
+    ({
+      Concluído: 100,
+      "Em andamento": 60,
+      Revisão: 85,
+      Planejamento: 20,
+      Novo: 10,
+    })[status] ?? 40;
+  const dynamicOperation = operationItems.slice(0, 3).map((item: any) => ({
+    name: item.title,
+    meta: item.subtitle || item.status,
+    value: statusProgress(item.status),
+    color: cfg.accent,
+  }));
+  const dynamicAlerts = [
+    pendingExpenses > 0
+      ? {
+          title: "Despesas pendentes",
+          meta: brl(pendingExpenses),
+          tone: "warn",
+        }
+      : null,
+    agendaItems.find((x: any) => !x.done)
+      ? {
+          title: agendaItems.find((x: any) => !x.done).title,
+          meta: "Próximo compromisso",
+          tone: "info",
+        }
+      : null,
+    operationItems.find((x: any) =>
+      String(x.status).toLowerCase().includes("baixo"),
+    )
+      ? {
+          title: operationItems.find((x: any) =>
+            String(x.status).toLowerCase().includes("baixo"),
+          ).title,
+          meta: "Requer atenção",
+          tone: "danger",
+        }
+      : null,
+  ].filter(Boolean) as any[];
+  const dynamicTasks = agendaItems
+    .filter((x: any) => !x.done)
+    .slice(0, 3)
+    .map((x: any) => x.title);
+  const primaryGoal = goalItems[0];
+  const monthLabels = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 5 + i);
+    return d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  });
+  const monthKeys = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 5 + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const chartSeries = monthKeys.map((key) =>
+    financeItems
+      .filter(
+        (x: any) => x.type === "Entrada" && String(x.date).startsWith(key),
+      )
+      .reduce((s: number, x: any) => s + Number(x.amount), 0),
+  );
+  const previousRevenue = chartSeries[chartSeries.length - 2] || 0,
+    currentRevenue = chartSeries[chartSeries.length - 1] || 0;
+  const revenueChange = previousRevenue
+    ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
+    : 0;
   const addExpense = async () => {
     const amount = Number(expenseDraft.amount.replace(",", "."));
     if (!expenseDraft.description.trim() || !amount) return;
-    try{const created=await createTransaction(owner,{...expenseDraft,amount,type:"Saída"});setFinanceItems([created,...financeItems]);setExpenseDraft({...expenseDraft,description:"",amount:""});setExpenseOpen(false)}catch{return}
+    try {
+      const created = await createTransaction(owner, {
+        ...expenseDraft,
+        amount,
+        type: "Saída",
+      });
+      setFinanceItems([created, ...financeItems]);
+      setExpenseDraft({ ...expenseDraft, description: "", amount: "" });
+      setExpenseOpen(false);
+    } catch {
+      return;
+    }
   };
   const periodIndex = (
     ["7 dias", "30 dias", "90 dias", "Este ano"] as Period[]
   ).indexOf(period);
-  const revenue = financeItems.length ? receivedIncome : cfg.kpis[0].values[periodIndex];
+  const revenue = financeItems.length
+    ? receivedIncome
+    : cfg.kpis[0].values[periodIndex];
   const toggleWidget = (x: string) => {
     const next = hidden.includes(x)
       ? hidden.filter((y) => y !== x)
@@ -322,10 +365,11 @@ export function ProfessionalDashboard({
   };
   const exportData = () => {
     const rows = [
-      "Indicador,Valor,Variação",
-      ...cfg.kpis.map(
-        (k) => `${k.label},${k.values[periodIndex]},${k.change}%`,
-      ),
+      "Indicador,Valor",
+      `${cfg.kpis[0].label},${receivedIncome}`,
+      `${cfg.kpis[1].label},${actualProfit}`,
+      `${cfg.kpis[2].label},${owner === "gabriel" ? operationItems.length : secondaryCount}`,
+      `${cfg.kpis[3].label},${owner === "giovanna" ? (secondaryCount ? receivedIncome / secondaryCount : 0) : secondaryCount ? (operationItems.length / secondaryCount) * 100 : 0}`,
     ];
     const a = document.createElement("a");
     a.href = URL.createObjectURL(
@@ -334,9 +378,24 @@ export function ProfessionalDashboard({
     a.download = `dashboard-${owner}.csv`;
     a.click();
   };
-  const refresh = () => {
+  const refresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 700);
+    try {
+      const [finance, operation, secondary, agenda, goals] = await Promise.all([
+        listTransactions(owner),
+        listRecords(owner, owner === "gabriel" ? "Projetos" : "Estoque"),
+        listRecords(owner, owner === "gabriel" ? "CRM" : "Pedidos"),
+        listEvents(owner),
+        listGoals(),
+      ]);
+      setFinanceItems(finance);
+      setOperationItems(operation);
+      setSecondaryCount(secondary.length);
+      setAgendaItems(agenda);
+      setGoalItems(goals);
+    } finally {
+      setRefreshing(false);
+    }
   };
   return (
     <div className={`professionalDashboard dashboard-${owner}`}>
@@ -426,7 +485,25 @@ export function ProfessionalDashboard({
         <section className="proKpis" aria-label="Indicadores principais">
           {cfg.kpis.map((k, i) => {
             const Icon = k.icon,
-              val = financeItems.length && i===0 ? receivedIncome : financeItems.length && i===1 ? actualProfit : k.values[periodIndex];
+              val =
+                i === 0
+                  ? receivedIncome
+                  : i === 1
+                    ? actualProfit
+                    : i === 2
+                      ? owner === "gabriel"
+                        ? operationItems.length
+                        : secondaryCount
+                      : owner === "giovanna"
+                        ? secondaryCount
+                          ? receivedIncome / secondaryCount
+                          : 0
+                        : secondaryCount
+                          ? Math.round(
+                              (operationItems.length / secondaryCount) * 100,
+                            )
+                          : 0,
+              changeValue = i < 2 ? revenueChange : 0;
             return (
               <motion.article
                 initial={{ opacity: 0, y: 8 }}
@@ -448,11 +525,11 @@ export function ProfessionalDashboard({
                       : brl(val)}
                 </strong>
                 <small className="up">
-                  <ArrowUpRight />
-                  {k.change}% <span>vs. período anterior</span>
+                  {changeValue >= 0 ? <ArrowUpRight /> : <ArrowDownRight />}
+                  {Math.abs(changeValue)}% <span>vs. mês anterior</span>
                 </small>
                 <div className="miniBars">
-                  {cfg.series.slice(-5).map((x, n) => (
+                  {chartSeries.slice(-5).map((x, n) => (
                     <i
                       key={n}
                       style={{ height: `${20 + x}%`, opacity: 0.35 + n * 0.13 }}
@@ -479,12 +556,13 @@ export function ProfessionalDashboard({
             <div className="revenueTotal">
               <strong>{brl(revenue)}</strong>
               <span>
-                <ArrowUpRight /> {cfg.kpis[0].change}%
+                {revenueChange >= 0 ? <ArrowUpRight /> : <ArrowDownRight />}{" "}
+                {Math.abs(revenueChange)}%
               </span>
             </div>
             <TrendChart
-              values={cfg.series}
-              labels={cfg.labels}
+              values={chartSeries.length ? chartSeries : [0, 0, 0, 0, 0, 0]}
+              labels={monthLabels}
               color={cfg.accent}
             />
             <div className="chartLegend">
@@ -492,7 +570,7 @@ export function ProfessionalDashboard({
                 <i />
                 Receita realizada
               </span>
-              <b>Meta: {brl(revenue * 1.2)}</b>
+              <b>{financeItems.length} lançamentos registrados</b>
             </div>
           </section>
         )}
@@ -511,7 +589,7 @@ export function ProfessionalDashboard({
                 Ver tudo <ChevronRight />
               </button>
             </div>
-            {cfg.operation.map((x) => (
+            {dynamicOperation.map((x) => (
               <div className="operationRow" key={x.name}>
                 <div>
                   <b>{x.name}</b>
@@ -523,6 +601,15 @@ export function ProfessionalDashboard({
                 </span>
               </div>
             ))}
+            {!dynamicOperation.length && (
+              <div className="dashboardEmpty">
+                <FolderKanban />
+                <b>Nenhum registro ainda</b>
+                <span>
+                  Cadastre o primeiro item para acompanhar o desempenho.
+                </span>
+              </div>
+            )}
           </section>
         )}
       </div>
@@ -534,9 +621,9 @@ export function ProfessionalDashboard({
                 <h2>Alertas e atenção</h2>
                 <p>Itens que precisam de você</p>
               </div>
-              <span className="countBadge">{cfg.alerts.length}</span>
+              <span className="countBadge">{dynamicAlerts.length}</span>
             </div>
-            {cfg.alerts.map((x, i) => (
+            {dynamicAlerts.map((x, i) => (
               <button
                 onClick={() =>
                   onNavigate(
@@ -565,6 +652,13 @@ export function ProfessionalDashboard({
                 <ChevronRight />
               </button>
             ))}
+            {!dynamicAlerts.length && (
+              <div className="dashboardEmpty compact">
+                <CheckCircle2 />
+                <b>Tudo em dia</b>
+                <span>Nenhum alerta no momento.</span>
+              </div>
+            )}
           </section>
         )}
         {!hidden.includes("tasks") && (
@@ -573,14 +667,14 @@ export function ProfessionalDashboard({
               <div>
                 <h2>Tarefas prioritárias</h2>
                 <p>
-                  {completed.length} de {cfg.tasks.length} concluídas
+                  {completed.length} de {dynamicTasks.length} concluídas
                 </p>
               </div>
               <button onClick={() => onNavigate("Agenda")}>
                 Agenda <ChevronRight />
               </button>
             </div>
-            {cfg.tasks.map((x, i) => (
+            {dynamicTasks.map((x, i) => (
               <label className={completed.includes(i) ? "checked" : ""} key={x}>
                 <input
                   type="checkbox"
@@ -598,12 +692,24 @@ export function ProfessionalDashboard({
               <span>
                 <i
                   style={{
-                    width: `${(completed.length / cfg.tasks.length) * 100}%`,
+                    width: `${dynamicTasks.length ? (completed.length / dynamicTasks.length) * 100 : 0}%`,
                   }}
                 />
               </span>
-              <b>{Math.round((completed.length / cfg.tasks.length) * 100)}%</b>
+              <b>
+                {dynamicTasks.length
+                  ? Math.round((completed.length / dynamicTasks.length) * 100)
+                  : 0}
+                %
+              </b>
             </div>
+            {!dynamicTasks.length && (
+              <div className="dashboardEmpty compact">
+                <CalendarDays />
+                <b>Agenda livre</b>
+                <span>Adicione compromissos na Agenda.</span>
+              </div>
+            )}
           </section>
         )}
         {!hidden.includes("goal") && (
@@ -612,21 +718,47 @@ export function ProfessionalDashboard({
               <Target />
             </div>
             <span className="eyebrow">META EM CONJUNTO</span>
-            <h2>Viagem para Itália</h2>
-            <p>Vocês estão quase na metade do caminho.</p>
-            <div className="goalNumbers">
-              <b>R$ 14.800</b>
-              <span>de R$ 30.000</span>
-            </div>
-            <div className="goalLine">
-              <i />
-            </div>
-            <div className="goalFoot">
-              <strong>49% concluído</strong>
-              <button onClick={() => onNavigate("Metas")}>
-                Ver meta <ChevronRight />
-              </button>
-            </div>
+            {primaryGoal ? (
+              <>
+                <h2>{primaryGoal.title}</h2>
+                <p>
+                  {primaryGoal.description || "Meta compartilhada do grupo."}
+                </p>
+                <div className="goalNumbers">
+                  <b>{brl(Number(primaryGoal.current_amount || 0))}</b>
+                  <span>de {brl(Number(primaryGoal.target_amount || 0))}</span>
+                </div>
+                <div className="goalLine">
+                  <i
+                    style={{
+                      width: `${Number(primaryGoal.target_amount) ? Math.min(100, (Number(primaryGoal.current_amount) / Number(primaryGoal.target_amount)) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+                <div className="goalFoot">
+                  <strong>
+                    {Number(primaryGoal.target_amount)
+                      ? Math.round(
+                          (Number(primaryGoal.current_amount) /
+                            Number(primaryGoal.target_amount)) *
+                            100,
+                        )
+                      : 0}
+                    % concluído
+                  </strong>
+                  <button onClick={() => onNavigate("Metas")}>
+                    Ver meta <ChevronRight />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="dashboardEmpty goalEmpty">
+                <Target />
+                <b>Nenhuma meta criada</b>
+                <span>Crie uma meta compartilhada para acompanhar aqui.</span>
+                <button onClick={() => onNavigate("Metas")}>Criar meta</button>
+              </div>
+            )}
           </section>
         )}
       </div>

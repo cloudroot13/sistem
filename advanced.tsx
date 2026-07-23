@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { createEvent, createTransaction, deleteEvent, deleteTransaction, listEvents, listTransactions, updateEvent } from "./services/data";
+import {
+  createEvent,
+  createTransaction,
+  deleteEvent,
+  deleteTransaction,
+  listEvents,
+  listTransactions,
+  updateEvent,
+} from "./services/data";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays,
@@ -156,8 +164,12 @@ const eventSeed: Record<string, EventItem[]> = {
 };
 export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
   const [items, setItems] = useState<Transaction[]>([]);
-  const [dataError,setDataError]=useState("");
-  useEffect(()=>{listTransactions(owner).then(setItems).catch(()=>setDataError("Não foi possível carregar o financeiro."))},[owner]);
+  const [dataError, setDataError] = useState("");
+  useEffect(() => {
+    listTransactions(owner)
+      .then(setItems)
+      .catch(() => setDataError("Não foi possível carregar o financeiro."));
+  }, [owner]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("Todos");
   const [open, setOpen] = useState(false);
@@ -188,7 +200,18 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
   );
   const add = async () => {
     if (!draft.description || !Number(draft.amount)) return;
-    try{const created=await createTransaction(owner,{...draft,amount:Number(draft.amount)});setItems([created,...items]);setOpen(false);setDraft({...draft,description:"",category:"",amount:""});setDataError("")}catch{setDataError("Não foi possível salvar o lançamento.")}
+    try {
+      const created = await createTransaction(owner, {
+        ...draft,
+        amount: Number(draft.amount),
+      });
+      setItems([created, ...items]);
+      setOpen(false);
+      setDraft({ ...draft, description: "", category: "", amount: "" });
+      setDataError("");
+    } catch {
+      setDataError("Não foi possível salvar o lançamento.");
+    }
   };
   const csv = () => {
     const data = [
@@ -251,7 +274,11 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
           </span>
         </article>
       </section>
-      {dataError&&<div className="dataError" role="alert">{dataError}</div>}
+      {dataError && (
+        <div className="dataError" role="alert">
+          {dataError}
+        </div>
+      )}
       <section
         className="card advancedCard"
         aria-labelledby="transactions-title"
@@ -308,7 +335,13 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
               </strong>
               <button
                 aria-label={`Excluir ${x.description}`}
-                onClick={() => deleteTransaction(String(x.id)).then(()=>setItems(items.filter(y=>y.id!==x.id))).catch(()=>setDataError("Não foi possível excluir o lançamento."))}
+                onClick={() =>
+                  deleteTransaction(String(x.id))
+                    .then(() => setItems(items.filter((y) => y.id !== x.id)))
+                    .catch(() =>
+                      setDataError("Não foi possível excluir o lançamento."),
+                    )
+                }
               >
                 ×
               </button>
@@ -430,8 +463,12 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
 }
 export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
   const [items, setItems] = useState<EventItem[]>([]);
-  const [dataError,setDataError]=useState("");
-  useEffect(()=>{listEvents(owner).then(setItems).catch(()=>setDataError("Não foi possível carregar a agenda."))},[owner]);
+  const [dataError, setDataError] = useState("");
+  useEffect(() => {
+    listEvents(owner)
+      .then(setItems)
+      .catch(() => setDataError("Não foi possível carregar a agenda."));
+  }, [owner]);
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState("2026-07-20");
   const [draft, setDraft] = useState({
@@ -449,7 +486,15 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
   });
   const add = async () => {
     if (!draft.title) return;
-    try{const created=await createEvent(owner,draft);setItems([created,...items]);setOpen(false);setDraft({...draft,title:""});setDataError("")}catch{setDataError("Não foi possível salvar o compromisso.")}
+    try {
+      const created = await createEvent(owner, draft);
+      setItems([created, ...items]);
+      setOpen(false);
+      setDraft({ ...draft, title: "" });
+      setDataError("");
+    } catch {
+      setDataError("Não foi possível salvar o compromisso.");
+    }
   };
   const selected = items
     .filter((x) => x.date === day)
@@ -519,7 +564,17 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
                   <input
                     type="checkbox"
                     checked={x.done}
-                    onChange={()=>{const done=!x.done;setItems(items.map(y=>y.id===x.id?{...y,done}:y));updateEvent(String(x.id),{done}).catch(()=>setDataError("Não foi possível atualizar o compromisso."))}}
+                    onChange={() => {
+                      const done = !x.done;
+                      setItems(
+                        items.map((y) => (y.id === x.id ? { ...y, done } : y)),
+                      );
+                      updateEvent(String(x.id), { done }).catch(() =>
+                        setDataError(
+                          "Não foi possível atualizar o compromisso.",
+                        ),
+                      );
+                    }}
                   />
                   <span className="sr-only">
                     Marcar {x.title} como concluído
@@ -527,7 +582,13 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
                 </label>
                 <button
                   aria-label={`Excluir ${x.title}`}
-                  onClick={() => deleteEvent(String(x.id)).then(()=>setItems(items.filter(y=>y.id!==x.id))).catch(()=>setDataError("Não foi possível excluir o compromisso."))}
+                  onClick={() =>
+                    deleteEvent(String(x.id))
+                      .then(() => setItems(items.filter((y) => y.id !== x.id)))
+                      .catch(() =>
+                        setDataError("Não foi possível excluir o compromisso."),
+                      )
+                  }
                 >
                   ×
                 </button>
