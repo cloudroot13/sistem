@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.10.3 — correção do sidebar
+
+- Sidebar em coluna flexível sem sobreposição.
+- Navegação com rolagem independente.
+- Versão, atalhos e perfil fixados na área inferior.
+- Ajustes para telas baixas, modo recolhido e celular.
+
 ## 1.10.2 — verificação compatível
 
 - O verificador informa quando `products.reserved` ainda não existe.
