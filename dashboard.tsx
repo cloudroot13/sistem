@@ -4,8 +4,11 @@ import {
   createTransaction,
   listEvents,
   listGoals,
+  listOrders,
+  listProducts,
   listRecords,
   listTransactions,
+  updateEvent,
 } from "./services/data";
 import {
   AlertTriangle,
@@ -194,15 +197,6 @@ export function ProfessionalDashboard({
         return [];
       }
     }),
-    [completed, setCompleted] = useState<number[]>(() => {
-      try {
-        return JSON.parse(
-          localStorage.getItem(`dashboard-tasks-${owner}`) || "[]",
-        );
-      } catch {
-        return [];
-      }
-    }),
     [refreshing, setRefreshing] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [financeItems, setFinanceItems] = useState<any[]>([]);
@@ -217,8 +211,20 @@ export function ProfessionalDashboard({
     [secondaryCount, setSecondaryCount] = useState(0);
   useEffect(() => {
     Promise.all([
-      listRecords(owner, owner === "gabriel" ? "Projetos" : "Estoque"),
-      listRecords(owner, owner === "gabriel" ? "CRM" : "Pedidos"),
+      owner === "gabriel"
+        ? listRecords(owner, "Projetos")
+        : listProducts(owner).then((items) =>
+            items.map((item) => ({
+              ...item,
+              title: item.name,
+              subtitle: `${item.stock} unidades`,
+              status:
+                item.stock <= item.low_stock_at
+                  ? "Estoque baixo"
+                  : "Disponível",
+            })),
+          ),
+      owner === "gabriel" ? listRecords(owner, "CRM") : listOrders(owner),
       listEvents(owner),
       listGoals(),
     ])
@@ -300,10 +306,7 @@ export function ProfessionalDashboard({
         }
       : null,
   ].filter(Boolean) as any[];
-  const dynamicTasks = agendaItems
-    .filter((x: any) => !x.done)
-    .slice(0, 3)
-    .map((x: any) => x.title);
+  const dynamicTasks = agendaItems.filter((x: any) => !x.done).slice(0, 3);
   const primaryGoal = goalItems[0];
   const monthLabels = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
@@ -356,12 +359,18 @@ export function ProfessionalDashboard({
     setHidden(next);
     localStorage.setItem(`dashboard-hidden-${owner}`, JSON.stringify(next));
   };
-  const toggleTask = (i: number) => {
-    const next = completed.includes(i)
-      ? completed.filter((x) => x !== i)
-      : [...completed, i];
-    setCompleted(next);
-    localStorage.setItem(`dashboard-tasks-${owner}`, JSON.stringify(next));
+  const toggleTask = async (id: string) => {
+    const previous = agendaItems;
+    setAgendaItems(
+      agendaItems.map((item: any) =>
+        String(item.id) === id ? { ...item, done: true } : item,
+      ),
+    );
+    try {
+      await updateEvent(id, { done: true });
+    } catch {
+      setAgendaItems(previous);
+    }
   };
   const exportData = () => {
     const rows = [
@@ -383,8 +392,20 @@ export function ProfessionalDashboard({
     try {
       const [finance, operation, secondary, agenda, goals] = await Promise.all([
         listTransactions(owner),
-        listRecords(owner, owner === "gabriel" ? "Projetos" : "Estoque"),
-        listRecords(owner, owner === "gabriel" ? "CRM" : "Pedidos"),
+        owner === "gabriel"
+          ? listRecords(owner, "Projetos")
+          : listProducts(owner).then((items) =>
+              items.map((item) => ({
+                ...item,
+                title: item.name,
+                subtitle: `${item.stock} unidades`,
+                status:
+                  item.stock <= item.low_stock_at
+                    ? "Estoque baixo"
+                    : "Disponível",
+              })),
+            ),
+        owner === "gabriel" ? listRecords(owner, "CRM") : listOrders(owner),
         listEvents(owner),
         listGoals(),
       ]);
@@ -666,42 +687,33 @@ export function ProfessionalDashboard({
             <div className="proCardHead">
               <div>
                 <h2>Tarefas prioritárias</h2>
-                <p>
-                  {completed.length} de {dynamicTasks.length} concluídas
-                </p>
+                <p>{dynamicTasks.length} compromissos pendentes</p>
               </div>
               <button onClick={() => onNavigate("Agenda")}>
                 Agenda <ChevronRight />
               </button>
             </div>
-            {dynamicTasks.map((x, i) => (
-              <label className={completed.includes(i) ? "checked" : ""} key={x}>
+            {dynamicTasks.map((task: any) => (
+              <label key={task.id}>
                 <input
                   type="checkbox"
-                  checked={completed.includes(i)}
-                  onChange={() => toggleTask(i)}
+                  checked={false}
+                  onChange={() => void toggleTask(String(task.id))}
                 />
                 <i>
                   <CheckCircle2 />
                 </i>
-                <span>{x}</span>
-                <small>Hoje</small>
+                <span>{task.title}</span>
+                <small>
+                  {new Date(`${task.date}T12:00`).toLocaleDateString("pt-BR")}
+                </small>
               </label>
             ))}
             <div className="taskProgress">
               <span>
-                <i
-                  style={{
-                    width: `${dynamicTasks.length ? (completed.length / dynamicTasks.length) * 100 : 0}%`,
-                  }}
-                />
+                <i style={{ width: "0%" }} />
               </span>
-              <b>
-                {dynamicTasks.length
-                  ? Math.round((completed.length / dynamicTasks.length) * 100)
-                  : 0}
-                %
-              </b>
+              <b>{dynamicTasks.length} pendentes</b>
             </div>
             {!dynamicTasks.length && (
               <div className="dashboardEmpty compact">

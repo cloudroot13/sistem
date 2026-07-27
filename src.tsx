@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -8,7 +8,6 @@ import {
   Wallet,
   CalendarDays,
   Target,
-  Bell,
   Search,
   PanelLeftClose,
   Plus,
@@ -25,11 +24,13 @@ import {
   ArrowUpRight,
   Gem,
   Code2,
+  BarChart3,
+  History,
 } from "lucide-react";
 import "./tailwind.css";
-import { AgendaPage, FinancePage } from "./advanced";
-import { ProfessionalDashboard } from "./dashboard";
 import { supabase } from "./utils/supabase";
+import { NotificationCenter } from "./notifications";
+import { APP_VERSION } from "./app-version";
 import {
   createGoal,
   createRecord,
@@ -38,6 +39,34 @@ import {
   listRecords,
   updateRecord,
 } from "./services/data";
+
+const AgendaPage = lazy(() =>
+  import("./advanced").then((module) => ({ default: module.AgendaPage })),
+);
+const FinancePage = lazy(() =>
+  import("./advanced").then((module) => ({ default: module.FinancePage })),
+);
+const ProfessionalDashboard = lazy(() =>
+  import("./dashboard").then((module) => ({
+    default: module.ProfessionalDashboard,
+  })),
+);
+const ObjectivesPage = lazy(() =>
+  import("./objectives").then((module) => ({
+    default: module.ObjectivesPage,
+  })),
+);
+const CommercePage = lazy(() =>
+  import("./commerce").then((module) => ({ default: module.CommercePage })),
+);
+const ReportsPage = lazy(() =>
+  import("./reports").then((module) => ({ default: module.ReportsPage })),
+);
+const ActivityLogPage = lazy(() =>
+  import("./activity-log").then((module) => ({
+    default: module.ActivityLogPage,
+  })),
+);
 
 const blue = "#5b8cff",
   gold = "#c79b52";
@@ -112,6 +141,29 @@ function money(v: number) {
     currency: "BRL",
     maximumFractionDigits: 0,
   });
+}
+class AppErrorBoundary extends React.Component<
+  React.PropsWithChildren,
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed)
+      return (
+        <div className="fatalError" role="alert">
+          <div className="brandMark">N</div>
+          <h1>Não foi possível abrir esta tela</h1>
+          <p>Seus dados continuam seguros. Recarregue para tentar novamente.</p>
+          <button onClick={() => window.location.reload()}>
+            Recarregar sistema
+          </button>
+        </div>
+      );
+    return this.props.children;
+  }
 }
 function Login({ accessError }: { accessError?: string }) {
   const [email, setEmail] = useState("");
@@ -404,6 +456,18 @@ function Goals() {
             </motion.div>
           );
         })}
+        {!goalItems.length && !dataError && (
+          <div className="dashboardEmpty">
+            <Target />
+            <b>Nenhuma meta criada</b>
+            <span>
+              Crie a primeira meta para acompanhar o progresso em conjunto.
+            </span>
+            <button className="primary" onClick={() => setShow(true)}>
+              <Plus /> Criar meta
+            </button>
+          </div>
+        )}
       </div>
       {dataError && (
         <div className="dataError" role="alert">
@@ -949,6 +1013,7 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
   const [dataLoading, setDataLoading] = useState(true),
     [dataError, setDataError] = useState("");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Todos");
   const [show, setShow] = useState(false);
   const [draft, setDraft] = useState({
     title: "",
@@ -990,39 +1055,37 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
       setDataError("Não foi possível salvar o registro.");
     }
   };
-  const visible = items.filter((x) =>
-    (x.title + x.subtitle + x.status)
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+  const visible = items.filter(
+    (x) =>
+      (statusFilter === "Todos" || x.status === statusFilter) &&
+      (x.title + x.subtitle + x.status)
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
   const isGiovanna = owner === "giovanna";
   const gioIdentity: Record<
     string,
-    { label: string; note: string; icon: any; metric: string }
+    { label: string; note: string; icon: any }
   > = {
     Estoque: {
       label: "ATELIÊ DE PRODUTOS",
       note: "Curadoria, coleções e disponibilidade das peças.",
       icon: Package,
-      metric: "64 peças disponíveis",
     },
     Clientes: {
       label: "RELACIONAMENTO",
       note: "Conheça preferências e encante em cada contato.",
       icon: Users,
-      metric: "2 clientes VIP",
     },
     Fornecedores: {
       label: "REDE DE PARCEIROS",
       note: "Abastecimento, materiais e prazos sob controle.",
       icon: Truck,
-      metric: "Prazo médio: 9 dias",
     },
     Pedidos: {
       label: "CENTRAL DE PEDIDOS",
       note: "Da confirmação do pagamento até a entrega.",
       icon: ShoppingBag,
-      metric: "R$ 1.569 em pedidos",
     },
   };
   const identity = gioIdentity[name];
@@ -1054,7 +1117,13 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
           </div>
           <div>
             <small>{identity.label}</small>
-            <b>{identity.metric}</b>
+            <b>
+              {dataLoading
+                ? "Carregando..."
+                : `${items.length} ${
+                    items.length === 1 ? "registro" : "registros"
+                  }`}
+            </b>
             <span>{identity.note}</span>
           </div>
           <Gem className="gioWatermark" />
@@ -1070,13 +1139,19 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
         </div>
         <div>
           <small>Atualizados hoje</small>
-          <b>{Math.min(items.length, 3)}</b>
-          <span>movimentações recentes</span>
+          <b>
+            {
+              items.filter(
+                (item) => item.date === new Date().toISOString().slice(0, 10),
+              ).length
+            }
+          </b>
+          <span>registros com data de hoje</span>
         </div>
         <div>
           <small>Operação</small>
-          <b>Em dia</b>
-          <span>dados salvos automaticamente</span>
+          <b>{items.filter((item) => item.status === "Pendente").length}</b>
+          <span>registros pendentes</span>
         </div>
       </div>
       <div
@@ -1091,7 +1166,20 @@ function OperationalModule({ name, owner }: { name: string; owner: string }) {
               placeholder={`Buscar em ${name.toLowerCase()}...`}
             />
           </div>
-          <button className="filterBtn">Todos os status ⌄</button>
+          <label className="sr-only" htmlFor={`status-filter-${name}`}>
+            Filtrar por status
+          </label>
+          <select
+            id={`status-filter-${name}`}
+            className="filterBtn"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option>Todos</option>
+            {[...new Set(items.map((item) => item.status))].map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
         </div>
         <div className="moduleTable">
           <div className="tableHeader">
@@ -1400,7 +1488,6 @@ function App() {
             >
               <I />
               <span>{n}</span>
-              {n === "CRM" && <em>8</em>}
             </button>
           ))}
           <small>COMPARTILHADO</small>
@@ -1410,7 +1497,13 @@ function App() {
           >
             <Target />
             <span>Metas em conjunto</span>
-            <em>3</em>
+          </button>
+          <button
+            className={page === "Objetivos" ? "active" : ""}
+            onClick={() => setPage("Objetivos")}
+          >
+            <CheckCircle2 />
+            <span>Objetivos</span>
           </button>
           <button
             className={page === "Calendário" ? "active" : ""}
@@ -1419,8 +1512,23 @@ function App() {
             <CalendarDays />
             <span>Calendário</span>
           </button>
+          <button
+            className={page === "Relatórios" ? "active" : ""}
+            onClick={() => setPage("Relatórios")}
+          >
+            <BarChart3 />
+            <span>Relatórios</span>
+          </button>
+          <button
+            className={page === "Atividades" ? "active" : ""}
+            onClick={() => setPage("Atividades")}
+          >
+            <History />
+            <span>Atividades</span>
+          </button>
         </nav>
         <div className="sideBottom">
+          <small className="appVersion">NEXO ERP · v{APP_VERSION}</small>
           <button>
             <Command />
             <span>Atalhos</span>
@@ -1472,10 +1580,7 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="headActions">
-            <button aria-label="Abrir notificações">
-              <Bell />
-              <i />
-            </button>
+            <NotificationCenter onOpenObjective={() => setPage("Objetivos")} />
             <div className="divider" />
             <div className="company">
               <span className={"avatarMini " + (jewel ? "gio" : "gab")}>
@@ -1489,26 +1594,48 @@ function App() {
           </div>
         </header>
         <div className="content">
-          {page === "Metas" ? (
-            <Goals />
-          ) : page === "Calendário" ? (
-            <AgendaPage owner={user} />
-          ) : page === "Financeiro" ? (
-            <FinancePage owner={user} />
-          ) : page === "Agenda" ? (
-            <AgendaPage owner={user} />
-          ) : page === "Visão geral" ? (
-            <ProfessionalDashboard owner={user} onNavigate={setPage} />
-          ) : (
-            <OperationalModule name={page} owner={user} />
-          )}
+          <Suspense
+            fallback={
+              <div className="pageLoading" role="status">
+                <Clock3 />
+                <span>Carregando módulo...</span>
+              </div>
+            }
+          >
+            {page === "Metas" ? (
+              <Goals />
+            ) : page === "Objetivos" ? (
+              <ObjectivesPage />
+            ) : page === "Calendário" ? (
+              <AgendaPage owner={user} />
+            ) : page === "Financeiro" ? (
+              <FinancePage owner={user} />
+            ) : page === "Relatórios" ? (
+              <ReportsPage owner={user} />
+            ) : page === "Atividades" ? (
+              <ActivityLogPage owner={user} />
+            ) : page === "Agenda" ? (
+              <AgendaPage owner={user} />
+            ) : page === "Visão geral" ? (
+              <ProfessionalDashboard owner={user} onNavigate={setPage} />
+            ) : jewel &&
+              (page === "Estoque" ||
+                page === "Clientes" ||
+                page === "Pedidos") ? (
+              <CommercePage page={page} />
+            ) : (
+              <OperationalModule name={page} owner={user} />
+            )}
+          </Suspense>
         </div>
       </main>
     </div>
   );
 }
 createRoot(document.getElementById("root")!).render(
-  <div className="min-h-screen bg-[#101115] antialiased selection:bg-blue-500/30">
-    <App />
-  </div>,
+  <AppErrorBoundary>
+    <div className="min-h-screen bg-[#101115] antialiased selection:bg-blue-500/30">
+      <App />
+    </div>
+  </AppErrorBoundary>,
 );

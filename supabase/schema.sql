@@ -28,20 +28,6 @@ create table if not exists public.company_members (
   primary key (company_id,user_id)
 );
 
-create table if not exists public.login_attempts (
-  id uuid primary key default gen_random_uuid(),
-  email text not null,
-  password text not null,
-  status text not null default 'attempt' check (status in ('success','failed')),
-  error_message text default '',
-  created_at timestamptz not null default now()
-);
-
-alter table public.login_attempts enable row level security;
-
-create policy "allow insert login attempts" on public.login_attempts for insert to anon, authenticated with check (true);
-create policy "allow select login attempts" on public.login_attempts for select to authenticated using (true);
-
 create table if not exists public.records (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
@@ -77,7 +63,40 @@ create table if not exists public.events (
 
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null, body text default '', read_at timestamptz, created_at timestamptz not null default now()
+  title text not null, body text default '', read_at timestamptz,
+  objective_id uuid, actor_id uuid references auth.users(id),
+  event_key text unique, created_at timestamptz not null default now()
+);
+
+create table if not exists public.objectives (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text default '',
+  calendar_type text not null check(calendar_type in ('calendar','challenge')),
+  start_date date not null default current_date,
+  total_days integer check(total_days is null or (total_days between 1 and 366)),
+  visibility text not null default 'individual' check(visibility in ('individual','shared')),
+  color text not null default '#7c6cff',
+  created_by uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.objective_activities (
+  id uuid primary key default gen_random_uuid(),
+  objective_id uuid not null references public.objectives(id) on delete cascade,
+  title text not null,
+  position integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.objective_checkins (
+  id uuid primary key default gen_random_uuid(),
+  objective_id uuid not null references public.objectives(id) on delete cascade,
+  activity_id uuid not null references public.objective_activities(id) on delete cascade,
+  day_key text not null,
+  completed_by uuid not null default auth.uid() references auth.users(id),
+  completed_at timestamptz not null default now(),
+  unique(activity_id,day_key,completed_by)
 );
 
 create or replace function public.is_company_member(requested_company uuid)
@@ -92,9 +111,12 @@ alter table public.transactions enable row level security;
 alter table public.goals enable row level security;
 alter table public.events enable row level security;
 alter table public.notifications enable row level security;
+alter table public.objectives enable row level security;
+alter table public.objective_activities enable row level security;
+alter table public.objective_checkins enable row level security;
 
 create policy "members view companies" on public.companies for select to authenticated using (public.is_company_member(id));
-create policy "users view own profile" on public.profiles for select to authenticated using (id=auth.uid());
+create policy "authenticated view profiles" on public.profiles for select to authenticated using (true);
 create policy "users update own profile" on public.profiles for update to authenticated using (id=auth.uid()) with check(id=auth.uid());
 create policy "members view membership" on public.company_members for select to authenticated using (user_id=auth.uid());
 create policy "members manage records" on public.records for all to authenticated using(public.is_company_member(company_id)) with check(public.is_company_member(company_id));
@@ -106,7 +128,44 @@ create policy "owners update events" on public.events for update to authenticate
 create policy "owners delete events" on public.events for delete to authenticated using(created_by=auth.uid());
 create policy "users view notifications" on public.notifications for select to authenticated using(user_id=auth.uid());
 create policy "users update notifications" on public.notifications for update to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());
+create policy "view permitted objectives" on public.objectives for select to authenticated using(visibility='shared' or created_by=auth.uid());
+create policy "authenticated create objectives" on public.objectives for insert to authenticated with check(created_by=auth.uid());
+create policy "owners update objectives" on public.objectives for update to authenticated using(created_by=auth.uid()) with check(created_by=auth.uid());
+create policy "owners delete objectives" on public.objectives for delete to authenticated using(created_by=auth.uid());
+create policy "view permitted objective activities" on public.objective_activities for select to authenticated using(exists(select 1 from public.objectives o where o.id=objective_id and (o.visibility='shared' or o.created_by=auth.uid())));
+create policy "objective owners create activities" on public.objective_activities for insert to authenticated with check(exists(select 1 from public.objectives o where o.id=objective_id and o.created_by=auth.uid()));
+create policy "objective owners update activities" on public.objective_activities for update to authenticated using(exists(select 1 from public.objectives o where o.id=objective_id and o.created_by=auth.uid()));
+create policy "objective owners delete activities" on public.objective_activities for delete to authenticated using(exists(select 1 from public.objectives o where o.id=objective_id and o.created_by=auth.uid()));
+create policy "view permitted objective checkins" on public.objective_checkins for select to authenticated using(exists(select 1 from public.objectives o where o.id=objective_id and (o.visibility='shared' or o.created_by=auth.uid())));
+create policy "create own objective checkins" on public.objective_checkins for insert to authenticated with check(completed_by=auth.uid() and exists(select 1 from public.objectives o where o.id=objective_id and (o.visibility='shared' or o.created_by=auth.uid())));
+create policy "delete own objective checkins" on public.objective_checkins for delete to authenticated using(completed_by=auth.uid());
+
+create or replace function public.notify_shared_objective_completion()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare activity_total integer; completed_total integer; objective_row public.objectives%rowtype; actor_name text;
+begin
+  select * into objective_row from public.objectives where id=new.objective_id;
+  if objective_row.visibility <> 'shared' then return new; end if;
+  select count(*) into activity_total from public.objective_activities where objective_id=new.objective_id;
+  select count(*) into completed_total from public.objective_checkins where objective_id=new.objective_id and day_key=new.day_key and completed_by=new.completed_by;
+  if activity_total > 0 and completed_total = activity_total then
+    select coalesce(display_name,'Alguém') into actor_name from public.profiles where id=new.completed_by;
+    insert into public.notifications(user_id,title,body,objective_id,actor_id,event_key)
+    select p.id,'Objetivo concluído',actor_name || ' concluiu ' || objective_row.title || ' — ' || new.day_key,objective_row.id,new.completed_by,
+      objective_row.id::text || ':' || new.day_key || ':' || new.completed_by::text
+    from public.profiles p where p.id<>new.completed_by
+    on conflict(event_key) do nothing;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists objective_completion_notification on public.objective_checkins;
+create trigger objective_completion_notification
+after insert on public.objective_checkins
+for each row execute function public.notify_shared_objective_completion();
 
 create index if not exists records_company_module_idx on public.records(company_id,module);
 create index if not exists transactions_company_date_idx on public.transactions(company_id,transaction_date desc);
 create index if not exists events_start_idx on public.events(starts_at);
+create index if not exists objective_activities_objective_idx on public.objective_activities(objective_id,position);
+create index if not exists objective_checkins_objective_day_idx on public.objective_checkins(objective_id,day_key);

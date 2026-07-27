@@ -21,6 +21,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { FinancialPlanning } from "./financial-planning";
 
 type Transaction = {
   id: string | number;
@@ -42,126 +43,6 @@ type EventItem = {
 };
 const brl = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-export const financeSeed: Record<string, Transaction[]> = {
-  gabriel: [
-    {
-      id: 1,
-      description: "Projeto Nuvem — Parcela 2",
-      category: "Projetos",
-      type: "Entrada",
-      amount: 6000,
-      date: "2026-07-20",
-      status: "Pago",
-    },
-    {
-      id: 2,
-      description: "Infraestrutura e assinaturas",
-      category: "Operacional",
-      type: "Saída",
-      amount: 1240,
-      date: "2026-07-18",
-      status: "Pago",
-    },
-    {
-      id: 3,
-      description: "Projeto Estúdio Lume",
-      category: "Projetos",
-      type: "Entrada",
-      amount: 4750,
-      date: "2026-07-15",
-      status: "Pendente",
-    },
-  ],
-  giovanna: [
-    {
-      id: 1,
-      description: "Vendas da semana",
-      category: "Pedidos",
-      type: "Entrada",
-      amount: 8240,
-      date: "2026-07-20",
-      status: "Pago",
-    },
-    {
-      id: 2,
-      description: "Reposição Coleção Aurora",
-      category: "Estoque",
-      type: "Saída",
-      amount: 2860,
-      date: "2026-07-18",
-      status: "Pago",
-    },
-    {
-      id: 3,
-      description: "Feira de semijoias",
-      category: "Marketing",
-      type: "Saída",
-      amount: 950,
-      date: "2026-07-24",
-      status: "Pendente",
-    },
-  ],
-};
-const eventSeed: Record<string, EventItem[]> = {
-  gabriel: [
-    {
-      id: 1,
-      title: "Reunião Projeto Nuvem",
-      kind: "Reunião",
-      date: "2026-07-20",
-      time: "10:00",
-      shared: true,
-      done: false,
-    },
-    {
-      id: 2,
-      title: "Follow-up Studio Norte",
-      kind: "Cliente",
-      date: "2026-07-20",
-      time: "14:30",
-      shared: false,
-      done: false,
-    },
-    {
-      id: 3,
-      title: "Entrega E-commerce Lume",
-      kind: "Entrega",
-      date: "2026-07-24",
-      time: "09:00",
-      shared: true,
-      done: false,
-    },
-  ],
-  giovanna: [
-    {
-      id: 1,
-      title: "Fotos Coleção Aurora",
-      kind: "Lançamento",
-      date: "2026-07-20",
-      time: "14:30",
-      shared: true,
-      done: false,
-    },
-    {
-      id: 2,
-      title: "Reposição de estoque",
-      kind: "Estoque",
-      date: "2026-07-21",
-      time: "09:00",
-      shared: false,
-      done: false,
-    },
-    {
-      id: 3,
-      title: "Feira de semijoias",
-      kind: "Evento",
-      date: "2026-07-24",
-      time: "16:00",
-      shared: true,
-      done: false,
-    },
-  ],
-};
 export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
   const [items, setItems] = useState<Transaction[]>([]);
   const [dataError, setDataError] = useState("");
@@ -178,7 +59,7 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
     category: "",
     type: "Entrada" as "Entrada" | "Saída",
     amount: "",
-    date: "2026-07-20",
+    date: new Date().toISOString().slice(0, 10),
     status: "Pago" as "Pago" | "Pendente",
   });
   const income = items
@@ -347,8 +228,19 @@ export function FinancePage({ owner }: { owner: "gabriel" | "giovanna" }) {
               </button>
             </article>
           ))}
+          {!visible.length && (
+            <div className="empty">
+              <Wallet />
+              <b>Nenhum lançamento encontrado</b>
+              <span>
+                Registre uma entrada ou despesa para iniciar o controle
+                financeiro.
+              </span>
+            </div>
+          )}
         </div>
       </section>
+      <FinancialPlanning owner={owner} />
       <AnimatePresence>
         {open && (
           <div
@@ -470,7 +362,16 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
       .catch(() => setDataError("Não foi possível carregar a agenda."));
   }, [owner]);
   const [open, setOpen] = useState(false);
-  const [day, setDay] = useState("2026-07-20");
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0, 10);
+  const startOfCurrentWeek = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() - today.getDay(),
+    12,
+  );
+  const [weekStart, setWeekStart] = useState(startOfCurrentWeek);
+  const [day, setDay] = useState(todayKey);
   const [draft, setDraft] = useState({
     title: "",
     kind: "Reunião",
@@ -480,10 +381,24 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
     done: false,
   });
   const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date("2026-07-20T12:00");
+    const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     return d;
   });
+  const moveWeek = (direction: number) => {
+    const next = new Date(weekStart);
+    next.setDate(next.getDate() + direction * 7);
+    setWeekStart(next);
+    setDay(next.toISOString().slice(0, 10));
+  };
+  const weekLabel = `${days[0].toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  })} — ${days[6].toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })}`;
   const add = async () => {
     if (!draft.title) return;
     try {
@@ -515,11 +430,11 @@ export function AgendaPage({ owner }: { owner: "gabriel" | "giovanna" }) {
       <section className="agendaLayout">
         <div className="card weekAgenda">
           <div className="agendaNav">
-            <button aria-label="Semana anterior">
+            <button aria-label="Semana anterior" onClick={() => moveWeek(-1)}>
               <ChevronLeft />
             </button>
-            <h2>20 — 26 de julho de 2026</h2>
-            <button aria-label="Próxima semana">
+            <h2>{weekLabel}</h2>
+            <button aria-label="Próxima semana" onClick={() => moveWeek(1)}>
               <ChevronRight />
             </button>
           </div>
