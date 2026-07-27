@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.10.5 — conclusão de Objetivos
+
+- Botão destacado Concluir dia.
+- Estado visual claro de Concluído.
+- Conclusão de todas as atividades com uma ação.
+- Opção de desfazer a conclusão.
+
 ## 1.10.4 — rolagem do modal de Objetivos
 
 - Rolagem vertical por toque corrigida.

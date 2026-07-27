@@ -3,12 +3,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Circle,
   Flame,
   ListChecks,
   Plus,
+  RotateCcw,
   Sparkles,
   Target,
   Users,
@@ -211,6 +213,33 @@ export function ObjectivesPage() {
       await load();
     } catch {
       setError("Não foi possível criar o objetivo.");
+    }
+  };
+
+  const setDayCompleted = async (complete: boolean) => {
+    if (!objective || !selectedDay || !currentUserId) return;
+    setError("");
+    try {
+      await Promise.all(
+        objective.activities.map((activity) => {
+          const checked = objective.checkins.some(
+            (checkin) =>
+              checkin.activity_id === activity.id &&
+              checkin.day_key === selectedDay &&
+              checkin.completed_by === currentUserId,
+          );
+          if (checked === complete) return Promise.resolve();
+          return toggleObjectiveCheckin(
+            objective.id,
+            activity.id,
+            selectedDay,
+            complete,
+          );
+        }),
+      );
+      await load();
+    } catch {
+      setError("Não foi possível atualizar a conclusão deste dia.");
     }
   };
 
@@ -470,19 +499,38 @@ export function ObjectivesPage() {
                       );
                     })}
                   </div>
-                  {isDayComplete(selectedDay) && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="dayComplete"
-                    >
-                      <Check />
-                      <span>
-                        <b>Dia concluído!</b>
-                        <small>Você completou todas as atividades.</small>
-                      </span>
-                    </motion.div>
-                  )}
+                  <button
+                    className={`completeDayButton ${
+                      isDayComplete(selectedDay) ? "completed" : ""
+                    }`}
+                    onClick={() =>
+                      void setDayCompleted(!isDayComplete(selectedDay))
+                    }
+                    disabled={!selectedDay}
+                  >
+                    {isDayComplete(selectedDay) ? (
+                      <>
+                        <CheckCircle2 />
+                        <span>
+                          <b>Concluído</b>
+                          <small>
+                            Todas as atividades deste dia foram feitas
+                          </small>
+                        </span>
+                        <RotateCcw />
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 />
+                        <span>
+                          <b>Concluir dia</b>
+                          <small>
+                            Marcar todas as atividades como concluídas
+                          </small>
+                        </span>
+                      </>
+                    )}
+                  </button>
                   {objective.visibility === "shared" && (
                     <div className="participantStatus">
                       <small>PROGRESSO DE CADA PESSOA</small>
