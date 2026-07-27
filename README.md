@@ -1,4 +1,4 @@
-# Nexo ERP — v1.10.3
+# Nexo ERP — v1.10.4
 
 ERP responsivo para dois ambientes de negócio, desenvolvido com React,
 TypeScript, Vite, Tailwind CSS e Supabase.

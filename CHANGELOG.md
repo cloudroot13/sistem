@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.10.4 — rolagem do modal de Objetivos
+
+- Rolagem vertical por toque corrigida.
+- Altura máxima baseada na área visível do dispositivo.
+- Botão Criar objetivo permanece acessível no final do formulário.
+- Margem segura para celulares com barra inferior.
+
 ## 1.10.3 — correção do sidebar
 
 - Sidebar em coluna flexível sem sobreposição.
