@@ -1401,6 +1401,7 @@ function App() {
     if (nextPage === page) return;
     window.history.pushState({ page: nextPage }, "", window.location.href);
     setPage(nextPage);
+    if (window.innerWidth <= 720) setOpen(false);
   };
   useEffect(() => {
     if (!window.history.state?.page)
@@ -1481,6 +1482,13 @@ function App() {
             <small>{jewel ? "SEMI JOIAS" : "SOFTWARE"}</small>
           </span>
         </div>
+        <button
+          className="mobileSidebarClose"
+          aria-label="Fechar menu"
+          onClick={() => setOpen(false)}
+        >
+          <X />
+        </button>
         <button
           aria-label={open ? "Recolher menu" : "Expandir menu"}
           aria-expanded={open}

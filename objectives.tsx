@@ -54,6 +54,9 @@ export function ObjectivesPage() {
     null,
   );
   const [success, setSuccess] = useState("");
+  const [dayPanelOpen, setDayPanelOpen] = useState(false);
+  const [pendingActivities, setPendingActivities] = useState<string[]>([]);
+  const [progressResult, setProgressResult] = useState<number | null>(null);
   const [month, setMonth] = useState(() => new Date());
   const [currentUserId, setCurrentUserId] = useState("");
   const [participants, setParticipants] = useState<ObjectiveParticipant[]>([]);
@@ -134,6 +137,19 @@ export function ObjectivesPage() {
     objective?.checkins.filter(
       (checkin) => checkin.day_key === key && checkin.completed_by === userId,
     ) || [];
+  const openDay = (key: string) => {
+    setSelectedDay(key);
+    setPendingActivities(
+      objective?.checkins
+        .filter(
+          (checkin) =>
+            checkin.day_key === key && checkin.completed_by === currentUserId,
+        )
+        .map((checkin) => checkin.activity_id) || [],
+    );
+    setProgressResult(null);
+    setDayPanelOpen(true);
+  };
   const isDayComplete = (key: string, userId = currentUserId) =>
     !!objective?.activities.length &&
     dayCheckins(key, userId).length === objective.activities.length;
@@ -248,6 +264,40 @@ export function ObjectivesPage() {
       setTimeout(() => setSuccess(""), 3000);
     } catch {
       setError("Não foi possível atualizar a conclusão deste dia.");
+    }
+  };
+
+  const confirmDayProgress = async () => {
+    if (!objective || !selectedDay) return;
+    try {
+      await Promise.all(
+        objective.activities.map((activity) => {
+          const saved = objective.checkins.some(
+            (checkin) =>
+              checkin.activity_id === activity.id &&
+              checkin.day_key === selectedDay &&
+              checkin.completed_by === currentUserId,
+          );
+          const selected = pendingActivities.includes(activity.id);
+          return saved === selected
+            ? Promise.resolve()
+            : toggleObjectiveCheckin(
+                objective.id,
+                activity.id,
+                selectedDay,
+                selected,
+              );
+        }),
+      );
+      const percentage = objective.activities.length
+        ? Math.round(
+            (pendingActivities.length / objective.activities.length) * 100,
+          )
+        : 0;
+      setProgressResult(percentage);
+      await load();
+    } catch {
+      setError("Não foi possível confirmar o progresso.");
     }
   };
 
@@ -433,7 +483,7 @@ export function ObjectivesPage() {
                           aria-label={day.caption}
                           aria-pressed={selectedDay === day.key}
                           className={`${selectedDay === day.key ? "selected" : ""} ${isDayComplete(day.key) ? "complete" : ""}`}
-                          onClick={() => setSelectedDay(day.key)}
+                          onClick={() => openDay(day.key)}
                           key={day.key}
                         >
                           <span>{day.label}</span>
@@ -457,7 +507,18 @@ export function ObjectivesPage() {
                   </div>
                 </section>
 
-                <aside className="dayChecklist card">
+                <aside
+                  className={`dayChecklist card ${
+                    dayPanelOpen ? "dayPanelOpen" : ""
+                  }`}
+                >
+                  <button
+                    className="closeDayPanel"
+                    aria-label="Fechar check-in"
+                    onClick={() => setDayPanelOpen(false)}
+                  >
+                    <X />
+                  </button>
                   <div className="checklistHead">
                     <span>
                       <ListChecks />
@@ -474,7 +535,7 @@ export function ObjectivesPage() {
                         style={{
                           width: `${
                             objective.activities.length
-                              ? (dayCheckins(selectedDay).length /
+                              ? (pendingActivities.length /
                                   objective.activities.length) *
                                 100
                               : 0
@@ -483,22 +544,22 @@ export function ObjectivesPage() {
                       />
                     </span>
                     <b>
-                      {dayCheckins(selectedDay).length}/
-                      {objective.activities.length}
+                      {pendingActivities.length}/{objective.activities.length}
                     </b>
                   </div>
                   <div className="activityChecks">
                     {objective.activities.map((activity) => {
-                      const done = objective.checkins.some(
-                        (checkin) =>
-                          checkin.activity_id === activity.id &&
-                          checkin.day_key === selectedDay &&
-                          checkin.completed_by === currentUserId,
-                      );
+                      const done = pendingActivities.includes(activity.id);
                       return (
                         <button
                           className={done ? "done" : ""}
-                          onClick={() => void toggle(activity.id)}
+                          onClick={() =>
+                            setPendingActivities((current) =>
+                              current.includes(activity.id)
+                                ? current.filter((id) => id !== activity.id)
+                                : [...current, activity.id],
+                            )
+                          }
                           key={activity.id}
                         >
                           <i>{done ? <Check /> : <Circle />}</i>
@@ -508,37 +569,28 @@ export function ObjectivesPage() {
                     })}
                   </div>
                   <button
-                    className={`completeDayButton ${
-                      isDayComplete(selectedDay) ? "completed" : ""
-                    }`}
-                    onClick={() =>
-                      setConfirmCompletion(!isDayComplete(selectedDay))
-                    }
-                    disabled={!selectedDay}
+                    className="confirmProgressButton"
+                    onClick={() => void confirmDayProgress()}
                   >
-                    {isDayComplete(selectedDay) ? (
-                      <>
-                        <CheckCircle2 />
-                        <span>
-                          <b>Concluído</b>
-                          <small>
-                            Todas as atividades deste dia foram feitas
-                          </small>
-                        </span>
-                        <RotateCcw />
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 />
-                        <span>
-                          <b>Concluir dia</b>
-                          <small>
-                            Marcar todas as atividades como concluídas
-                          </small>
-                        </span>
-                      </>
-                    )}
+                    <CheckCircle2 />
+                    Confirmar progresso
                   </button>
+                  {progressResult !== null && (
+                    <motion.div
+                      className="progressCelebration"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <strong>{progressResult}%</strong>
+                      <span>do dia concluído</span>
+                      <i>
+                        <motion.b
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progressResult}%` }}
+                        />
+                      </i>
+                    </motion.div>
+                  )}
                   {objective.visibility === "shared" && (
                     <div className="participantStatus">
                       <small>PROGRESSO DE CADA PESSOA</small>

@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 1.10.7 — check-in diário mobile
+
+- Fechamento explícito do sidebar no celular.
+- Sidebar fecha automaticamente depois da navegação.
+- Painel de check-in ao selecionar um dia.
+- Seleções temporárias antes da confirmação.
+- Feedback animado do percentual concluído.
+
 ## 1.10.6 — navegação e confirmação
 
 - Botão voltar e histórico do navegador.
