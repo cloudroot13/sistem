@@ -26,6 +26,7 @@ import {
   Code2,
   BarChart3,
   History,
+  ArrowLeft,
 } from "lucide-react";
 import "./tailwind.css";
 import { supabase } from "./utils/supabase";
@@ -1390,10 +1391,25 @@ function ProfilePicker({
 }
 function App() {
   const [user, setUser] = useState<"gabriel" | "giovanna" | null>(null),
-    [page, setPage] = useState("Visão geral"),
+    [page, setPage] = useState(
+      () => window.history.state?.page || "Visão geral",
+    ),
     [open, setOpen] = useState(() => window.innerWidth > 720),
     [authLoading, setAuthLoading] = useState(true),
     [accessError, setAccessError] = useState("");
+  const navigate = (nextPage: string) => {
+    if (nextPage === page) return;
+    window.history.pushState({ page: nextPage }, "", window.location.href);
+    setPage(nextPage);
+  };
+  useEffect(() => {
+    if (!window.history.state?.page)
+      window.history.replaceState({ page: "Visão geral" }, "");
+    const handleBack = (event: PopStateEvent) =>
+      setPage(event.state?.page || "Visão geral");
+    window.addEventListener("popstate", handleBack);
+    return () => window.removeEventListener("popstate", handleBack);
+  }, []);
   useEffect(() => {
     let active = true;
     const resolveCompany = async (session: any) => {
@@ -1483,7 +1499,7 @@ function App() {
           {menu.map(([I, n]: any) => (
             <button
               className={page === n ? "active" : ""}
-              onClick={() => setPage(n)}
+              onClick={() => navigate(n)}
               key={n}
             >
               <I />
@@ -1493,35 +1509,35 @@ function App() {
           <small>COMPARTILHADO</small>
           <button
             className={page === "Metas" ? "active" : ""}
-            onClick={() => setPage("Metas")}
+            onClick={() => navigate("Metas")}
           >
             <Target />
             <span>Metas em conjunto</span>
           </button>
           <button
             className={page === "Objetivos" ? "active" : ""}
-            onClick={() => setPage("Objetivos")}
+            onClick={() => navigate("Objetivos")}
           >
             <CheckCircle2 />
             <span>Objetivos</span>
           </button>
           <button
             className={page === "Calendário" ? "active" : ""}
-            onClick={() => setPage("Calendário")}
+            onClick={() => navigate("Calendário")}
           >
             <CalendarDays />
             <span>Calendário</span>
           </button>
           <button
             className={page === "Relatórios" ? "active" : ""}
-            onClick={() => setPage("Relatórios")}
+            onClick={() => navigate("Relatórios")}
           >
             <BarChart3 />
             <span>Relatórios</span>
           </button>
           <button
             className={page === "Atividades" ? "active" : ""}
-            onClick={() => setPage("Atividades")}
+            onClick={() => navigate("Atividades")}
           >
             <History />
             <span>Atividades</span>
@@ -1563,6 +1579,15 @@ function App() {
       )}
       <main id="main-content" tabIndex={-1}>
         <header>
+          {page !== "Visão geral" && (
+            <button
+              className="pageBack"
+              aria-label="Voltar para a tela anterior"
+              onClick={() => window.history.back()}
+            >
+              <ArrowLeft />
+            </button>
+          )}
           <button
             aria-label="Abrir menu"
             aria-expanded={open}
@@ -1580,7 +1605,8 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="headActions">
-            <NotificationCenter onOpenObjective={() => setPage("Objetivos")} />
+            <small className="deployVersion">v{APP_VERSION}</small>
+            <NotificationCenter onOpenObjective={() => navigate("Objetivos")} />
             <div className="divider" />
             <div className="company">
               <span className={"avatarMini " + (jewel ? "gio" : "gab")}>
@@ -1617,7 +1643,7 @@ function App() {
             ) : page === "Agenda" ? (
               <AgendaPage owner={user} />
             ) : page === "Visão geral" ? (
-              <ProfessionalDashboard owner={user} onNavigate={setPage} />
+              <ProfessionalDashboard owner={user} onNavigate={navigate} />
             ) : jewel &&
               (page === "Estoque" ||
                 page === "Clientes" ||

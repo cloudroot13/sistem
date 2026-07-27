@@ -50,6 +50,10 @@ export function ObjectivesPage() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [confirmCompletion, setConfirmCompletion] = useState<boolean | null>(
+    null,
+  );
+  const [success, setSuccess] = useState("");
   const [month, setMonth] = useState(() => new Date());
   const [currentUserId, setCurrentUserId] = useState("");
   const [participants, setParticipants] = useState<ObjectiveParticipant[]>([]);
@@ -238,6 +242,10 @@ export function ObjectivesPage() {
         }),
       );
       await load();
+      setSuccess(
+        complete ? "Dia concluído com sucesso." : "Conclusão desfeita.",
+      );
+      setTimeout(() => setSuccess(""), 3000);
     } catch {
       setError("Não foi possível atualizar a conclusão deste dia.");
     }
@@ -504,7 +512,7 @@ export function ObjectivesPage() {
                       isDayComplete(selectedDay) ? "completed" : ""
                     }`}
                     onClick={() =>
-                      void setDayCompleted(!isDayComplete(selectedDay))
+                      setConfirmCompletion(!isDayComplete(selectedDay))
                     }
                     disabled={!selectedDay}
                   >
@@ -578,6 +586,58 @@ export function ObjectivesPage() {
       )}
 
       <AnimatePresence>
+        {success && (
+          <motion.div
+            className="objectiveToast"
+            role="status"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <CheckCircle2 /> {success}
+          </motion.div>
+        )}
+        {confirmCompletion !== null && (
+          <div className="modalBg confirmObjectiveBg">
+            <motion.div
+              role="alertdialog"
+              aria-modal="true"
+              className="modal confirmObjective"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <i>{confirmCompletion ? <CheckCircle2 /> : <RotateCcw />}</i>
+              <h2>
+                {confirmCompletion
+                  ? "Concluir este dia?"
+                  : "Desfazer a conclusão?"}
+              </h2>
+              <p>
+                {confirmCompletion
+                  ? "Todas as atividades serão marcadas como concluídas."
+                  : "Todas as marcações deste dia serão removidas."}
+              </p>
+              <div>
+                <button
+                  className="secondary"
+                  onClick={() => setConfirmCompletion(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    const value = confirmCompletion;
+                    setConfirmCompletion(null);
+                    void setDayCompleted(value);
+                  }}
+                >
+                  {confirmCompletion ? "Sim, concluir" : "Sim, desfazer"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
         {open && (
           <div className="modalBg" onClick={() => setOpen(false)}>
             <motion.div

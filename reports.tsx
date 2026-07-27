@@ -35,19 +35,20 @@ export function ReportsPage({ owner }: { owner: CompanySlug }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       listTransactions(owner),
       owner === "giovanna" ? listOrders(owner) : Promise.resolve([]),
       owner === "giovanna" ? listProducts(owner) : Promise.resolve([]),
       owner === "giovanna" ? listCustomers(owner) : Promise.resolve([]),
-    ])
-      .then(([finance, orderData, products, customers]) => {
-        setTransactions(finance);
-        setOrders(orderData);
-        setProductCount(products.length);
-        setCustomerCount(customers.length);
-      })
-      .catch(() => setError("Não foi possível carregar os relatórios."));
+    ]).then(([finance, orderData, products, customers]) => {
+      if (finance.status === "fulfilled") setTransactions(finance.value);
+      else setError("Os dados financeiros ainda não estão disponíveis.");
+      if (orderData.status === "fulfilled") setOrders(orderData.value);
+      if (products.status === "fulfilled")
+        setProductCount(products.value.length);
+      if (customers.status === "fulfilled")
+        setCustomerCount(customers.value.length);
+    });
   }, [owner]);
 
   const cutoff = useMemo(() => {

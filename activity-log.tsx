@@ -31,14 +31,17 @@ export function ActivityLogPage({ owner }: { owner: CompanySlug }) {
   const [entity, setEntity] = useState("Todos");
   const [error, setError] = useState("");
   useEffect(() => {
-    Promise.all([listActivityLogs(owner), listObjectiveParticipants()])
-      .then(([logs, profiles]) => {
-        setItems(logs);
-        setPeople(profiles);
-      })
-      .catch(() =>
-        setError("Execute audit-v1.7-migration.sql para ativar o histórico."),
-      );
+    listObjectiveParticipants()
+      .then(setPeople)
+      .catch(() => {});
+    listActivityLogs(owner)
+      .then(setItems)
+      .catch(() => {
+        setItems([]);
+        setError(
+          "O histórico ainda não foi ativado. Execute audit-v1.7-migration.sql.",
+        );
+      });
   }, [owner]);
   const visible = useMemo(
     () =>

@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.10.6 — navegação e confirmação
+
+- Botão voltar e histórico do navegador.
+- Relatórios tolerantes a módulos ainda não instalados.
+- Histórico abre com estado vazio quando a tabela estiver ausente.
+- Confirmação antes de concluir ou desfazer um Objetivo.
+- Mensagem visual após a conclusão.
+- Versão publicada visível no cabeçalho.
+
 ## 1.10.5 — conclusão de Objetivos
 
 - Botão destacado Concluir dia.
